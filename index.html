@@ -132,7 +132,7 @@
   .bar-row .bar-fill{height:100%;border-radius:6px;transition:width 300ms cubic-bezier(.2,.8,.2,1);}
   .bar-row .bar-value{width:56px;text-align:right;flex-shrink:0;color:var(--lx-fg-muted);font-weight:600;}
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer onerror="window.__gsiScriptFailed=true;"></script>
 </head>
 <body>
 <script>
@@ -143,40 +143,77 @@
   const SCAN_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-scan";
   let currentIdToken = null;
 
-  window.addEventListener("load", function(){
-    document.getElementById("loginGate").classList.add("show");
-    if (typeof google === "undefined") {
-      mostrarAvisoWebView();
+  function tentarIniciarLogin(){
+    if (window.__gsiScriptFailed) {
+      mostrarAvisoLogin("rede");
       return;
     }
-    google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      hosted_domain: DOMINIO_ESPERADO,
-      auto_select: false,
-      callback: handleCredentialResponse
-    });
-    google.accounts.id.renderButton(
-      document.getElementById("lgGoogleBtn"),
-      { theme: "filled_blue", size: "large", text: "signin_with", shape: "pill" }
-    );
-    // Se o botão não renderizar em ~2s, provavelmente é um WebView bloqueado pelo Google (ex: Fully Kiosk)
-    setTimeout(() => {
-      if (!document.getElementById("lgGoogleBtn").querySelector("div[role='button']")) {
-        mostrarAvisoWebView();
-      }
-    }, 2000);
-  });
-
-  function mostrarAvisoWebView(){
-    const btnBox = document.getElementById("lgGoogleBtn");
-    btnBox.innerHTML = `<div style="background:var(--chip-orange-bg,#FEE5CC);color:var(--chip-orange-fg,#CB6700);border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.5;text-align:left;">
-      <b>O login do Google não carregou.</b><br>
-      Se estiver no <b>Fully Kiosk Browser</b>: vá em <b>Configurações → Configurações de conteúdo web</b> e ative
-      <b>"Usar Chrome Custom Tabs"</b> (ou "Enable Google Sign-In"). O Google bloqueia login dentro de WebViews comuns por segurança.
-      Depois de ativar, recarregue esta página.
-    </div>`;
+    if (typeof google === "undefined" || !google.accounts) {
+      // Ainda não carregou — tenta de novo em breve (rede lenta é comum no celular)
+      return false;
+    }
+    try {
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        hosted_domain: DOMINIO_ESPERADO,
+        auto_select: false,
+        callback: handleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("lgGoogleBtn"),
+        { theme: "filled_blue", size: "large", text: "signin_with", shape: "pill" }
+      );
+    } catch (e) {
+      console.error("Erro ao iniciar o login do Google:", e);
+      mostrarAvisoLogin("erro", e.message);
+      return true;
+    }
+    return true;
   }
 
+  window.addEventListener("load", function(){
+    document.getElementById("loginGate").classList.add("show");
+    let tentativas = 0;
+    let jaInicializou = false;
+    const maxTentativas = 15; // ~15s no total, dá tempo pra redes mais lentas
+    const intervalo = setInterval(() => {
+      tentativas++;
+      if (!jaInicializou) {
+        jaInicializou = tentarIniciarLogin();
+      }
+      const botaoRenderizado = document.getElementById("lgGoogleBtn").querySelector("div[role='button']");
+      if (jaInicializou && botaoRenderizado) {
+        clearInterval(intervalo);
+      } else if (tentativas >= maxTentativas) {
+        clearInterval(intervalo);
+        if (!botaoRenderizado && !window.__avisoLoginMostrado) mostrarAvisoLogin("webview");
+      }
+    }, 1000);
+  });
+
+  function mostrarAvisoLogin(tipo, detalhe){
+    window.__avisoLoginMostrado = true;
+    const btnBox = document.getElementById("lgGoogleBtn");
+    let msg = "";
+    if (tipo === "rede") {
+      msg = `<b>Não consegui carregar o script de login do Google.</b><br>
+        Isso geralmente é bloqueio de rede/Wi-Fi (firewall corporativo) ou falta de conexão.
+        Verifica a internet e tenta recarregar a página.`;
+    } else if (tipo === "erro") {
+      msg = `<b>Ocorreu um erro ao iniciar o login.</b><br>
+        Detalhe técnico: ${detalhe || "desconhecido"}.<br>
+        Tenta recarregar a página. Se persistir, me avisa.`;
+    } else {
+      msg = `<b>O botão de login não apareceu depois de alguns segundos.</b><br>
+        Se estiver no <b>Fully Kiosk Browser</b> ou em um navegador embutido de outro app: abra o link direto no Chrome/Safari em vez de tocar num link dentro de outro app.
+        No Fully Kiosk, vá em <b>Configurações → Configurações de conteúdo web</b> e ative <b>"Usar Chrome Custom Tabs"</b>.<br>
+        Se já está no Chrome/Safari normal, tenta recarregar a página (puxar pra baixo) — pode ter sido só lentidão da rede.`;
+    }
+    btnBox.innerHTML = `<div style="background:var(--chip-orange-bg,#FEE5CC);color:var(--chip-orange-fg,#CB6700);border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.5;text-align:left;">
+      ${msg}
+    </div>
+    <button onclick="location.reload()" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg);font-size:13px;cursor:pointer;">🔄 Recarregar página</button>`;
+  }
 
   function decodeJwt(token){
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
