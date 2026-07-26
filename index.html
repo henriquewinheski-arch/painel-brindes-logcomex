@@ -358,6 +358,7 @@
           data: new Date(m.data_hora).toLocaleString("pt-BR"),
           item: m.item_id + " — " + (item ? item[1] : "?"),
           tipo: m.tipo,
+          quantidade: m.quantidade,
           resp: m.responsavel,
           obs: "Origem: " + (m.origem || "-")
         });
@@ -860,7 +861,7 @@ function renderAtividade(){
   const el = document.getElementById("listaAtividade");
   el.innerHTML = ATIVIDADE_SEED.map(a => `
     <div class="activity-item">
-      <div class="top"><span>${a.item}</span><span class="tipo-${a.tipo}">${a.tipo}</span></div>
+      <div class="top"><span>${a.item}</span><span class="tipo-${a.tipo}">${a.tipo}${a.quantidade != null ? " · " + a.quantidade + "un." : ""}</span></div>
       <div class="meta">${a.data} · ${a.resp} · ${a.obs}</div>
     </div>
   `).join("");
