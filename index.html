@@ -135,54 +135,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<div id="introOverlay" style="position:fixed;inset:0;background:#0B0D19;z-index:200;display:none;align-items:center;justify-content:center;">
-  <video id="introVideo" src="intro.mp4" playsinline
-    style="width:100%;height:100%;object-fit:cover;"></video>
-  <button id="introSkip" onclick="fecharIntro()" style="position:absolute;bottom:28px;right:28px;padding:10px 20px;border-radius:999px;border:1px solid rgba(226,208,250,.35);background:rgba(11,13,25,.55);color:#E2D0FA;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(2px);">
-    Pular introdução
-  </button>
-  <button id="introUnmute" onclick="ativarSom()" style="position:absolute;bottom:28px;left:28px;padding:10px 20px;border-radius:999px;border:1px solid rgba(226,208,250,.35);background:rgba(254,143,28,.9);color:#2D085D;font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:none;">
-    🔊 Ativar som
-  </button>
-</div>
 <script>
-  const introVideo = document.getElementById("introVideo");
-  const introOverlay = document.getElementById("introOverlay");
-  const introUnmute = document.getElementById("introUnmute");
-
-  function iniciarIntro(){
-    introOverlay.style.display = "flex";
-    introOverlay.style.opacity = "1";
-    introVideo.muted = false;
-    introVideo.currentTime = 0;
-    const p = introVideo.play();
-    if (p && p.catch){
-      p.catch(() => {
-        // navegador bloqueou áudio automático — toca mudo e oferece botão pra ativar som
-        introVideo.muted = true;
-        introVideo.play();
-        introUnmute.style.display = "block";
-      });
-    }
-  }
-
-  function ativarSom(){
-    introVideo.muted = false;
-    introUnmute.style.display = "none";
-  }
-
-  function fecharIntro(){
-    introOverlay.style.transition = "opacity 400ms ease";
-    introOverlay.style.opacity = "0";
-    setTimeout(() => {
-      introOverlay.style.display = "none";
-      document.getElementById("dashboardContent").style.display = "block";
-    }, 420);
-    introVideo.pause();
-  }
-  introVideo.addEventListener("ended", fecharIntro);
-  introVideo.addEventListener("error", fecharIntro); // se o vídeo não carregar, não trava o painel
-
   // ---- Login com Google ----
   const CLIENT_ID = "161510977968-oofrl3c78ijlt6t146lm35sdltdr4tdv.apps.googleusercontent.com";
   const DOMINIO_ESPERADO = "logcomex.com";
@@ -193,6 +146,7 @@
     google.accounts.id.initialize({
       client_id: CLIENT_ID,
       hosted_domain: DOMINIO_ESPERADO,
+      auto_select: false,
       callback: handleCredentialResponse
     });
     google.accounts.id.renderButton(
@@ -216,7 +170,32 @@
       return;
     }
     document.getElementById("loginGate").classList.remove("show");
-    iniciarIntro();
+    document.getElementById("dashboardContent").style.display = "block";
+    const v = document.getElementById("introVideoCard");
+    if (v){
+      v.muted = false;
+      const p = v.play();
+      if (p && p.catch){
+        p.catch(() => {
+          v.muted = true;
+          v.play();
+          document.getElementById("introUnmuteCard").style.display = "inline-flex";
+        });
+      }
+    }
+  }
+
+  function ativarSomCard(){
+    const v = document.getElementById("introVideoCard");
+    v.muted = false;
+    document.getElementById("introUnmuteCard").style.display = "none";
+  }
+
+  function fecharVideoCard(){
+    const card = document.getElementById("introCard");
+    const v = document.getElementById("introVideoCard");
+    v.pause();
+    card.style.display = "none";
   }
 </script>
 
@@ -259,6 +238,16 @@
 </div>
 
 <div class="wrap" id="dashboardContent">
+  <div class="card" id="introCard" style="display:flex;gap:16px;align-items:center;padding:14px 16px;">
+    <video id="introVideoCard" src="intro.mp4" playsinline
+      style="width:180px;height:101px;border-radius:12px;background:#000;flex-shrink:0;object-fit:cover;"></video>
+    <div style="flex:1;">
+      <div style="font-family:var(--lx-font-display);font-size:14px;color:var(--lx-primary-darkest);font-weight:600;">Bem-vindo ao Controle de Brindes</div>
+      <div style="font-size:12.5px;color:var(--lx-fg-muted);margin-top:2px;">Vídeo de introdução rápido (10s).</div>
+    </div>
+    <button id="introUnmuteCard" onclick="ativarSomCard()" style="display:none;padding:8px 14px;border-radius:999px;border:none;background:var(--lx-secondary-pure);color:var(--lx-primary-darkest);font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;">🔊 Ativar som</button>
+    <button onclick="fecharVideoCard()" style="padding:8px 14px;border-radius:999px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:12.5px;cursor:pointer;white-space:nowrap;">Fechar</button>
+  </div>
   <header>
     <div>
       <div class="brand-row">
