@@ -132,87 +132,30 @@
   .bar-row .bar-fill{height:100%;border-radius:6px;transition:width 300ms cubic-bezier(.2,.8,.2,1);}
   .bar-row .bar-value{width:56px;text-align:right;flex-shrink:0;color:var(--lx-fg-muted);font-weight:600;}
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer onerror="window.__gsiScriptFailed=true;"></script>
 </head>
 <body>
 <script>
-  // ---- Login com Google ----
+  // ---- Login com Google (fluxo de redirecionamento — funciona em qualquer navegador/WebView) ----
   const CLIENT_ID = "161510977968-oofrl3c78ijlt6t146lm35sdltdr4tdv.apps.googleusercontent.com";
   const DOMINIO_ESPERADO = "logcomex.com";
   const CONSULTA_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-consulta";
   const SCAN_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-scan";
+  const REDIRECT_URI = window.location.origin + window.location.pathname;
   let currentIdToken = null;
 
-  function tentarIniciarLogin(){
-    if (window.__gsiScriptFailed) {
-      mostrarAvisoLogin("rede");
-      return;
-    }
-    if (typeof google === "undefined" || !google.accounts) {
-      // Ainda não carregou — tenta de novo em breve (rede lenta é comum no celular)
-      return false;
-    }
-    try {
-      google.accounts.id.initialize({
-        client_id: CLIENT_ID,
-        hosted_domain: DOMINIO_ESPERADO,
-        auto_select: false,
-        callback: handleCredentialResponse
-      });
-      google.accounts.id.renderButton(
-        document.getElementById("lgGoogleBtn"),
-        { theme: "filled_blue", size: "large", text: "signin_with", shape: "pill" }
-      );
-    } catch (e) {
-      console.error("Erro ao iniciar o login do Google:", e);
-      mostrarAvisoLogin("erro", e.message);
-      return true;
-    }
-    return true;
-  }
-
-  window.addEventListener("load", function(){
-    document.getElementById("loginGate").classList.add("show");
-    let tentativas = 0;
-    let jaInicializou = false;
-    const maxTentativas = 15; // ~15s no total, dá tempo pra redes mais lentas
-    const intervalo = setInterval(() => {
-      tentativas++;
-      if (!jaInicializou) {
-        jaInicializou = tentarIniciarLogin();
-      }
-      const botaoRenderizado = document.getElementById("lgGoogleBtn").querySelector("div[role='button']");
-      if (jaInicializou && botaoRenderizado) {
-        clearInterval(intervalo);
-      } else if (tentativas >= maxTentativas) {
-        clearInterval(intervalo);
-        if (!botaoRenderizado && !window.__avisoLoginMostrado) mostrarAvisoLogin("webview");
-      }
-    }, 1000);
-  });
-
-  function mostrarAvisoLogin(tipo, detalhe){
-    window.__avisoLoginMostrado = true;
-    const btnBox = document.getElementById("lgGoogleBtn");
-    let msg = "";
-    if (tipo === "rede") {
-      msg = `<b>Não consegui carregar o script de login do Google.</b><br>
-        Isso geralmente é bloqueio de rede/Wi-Fi (firewall corporativo) ou falta de conexão.
-        Verifica a internet e tenta recarregar a página.`;
-    } else if (tipo === "erro") {
-      msg = `<b>Ocorreu um erro ao iniciar o login.</b><br>
-        Detalhe técnico: ${detalhe || "desconhecido"}.<br>
-        Tenta recarregar a página. Se persistir, me avisa.`;
-    } else {
-      msg = `<b>O botão de login não apareceu depois de alguns segundos.</b><br>
-        Se estiver no <b>Fully Kiosk Browser</b> ou em um navegador embutido de outro app: abra o link direto no Chrome/Safari em vez de tocar num link dentro de outro app.
-        No Fully Kiosk, vá em <b>Configurações → Configurações de conteúdo web</b> e ative <b>"Usar Chrome Custom Tabs"</b>.<br>
-        Se já está no Chrome/Safari normal, tenta recarregar a página (puxar pra baixo) — pode ter sido só lentidão da rede.`;
-    }
-    btnBox.innerHTML = `<div style="background:var(--chip-orange-bg,#FEE5CC);color:var(--chip-orange-fg,#CB6700);border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.5;text-align:left;">
-      ${msg}
-    </div>
-    <button onclick="location.reload()" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg);font-size:13px;cursor:pointer;">🔄 Recarregar página</button>`;
+  function iniciarLoginGoogle(){
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem("oauth_nonce", nonce);
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "id_token",
+      scope: "openid email profile",
+      nonce: nonce,
+      hd: DOMINIO_ESPERADO,
+      prompt: "select_account"
+    });
+    window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
   }
 
   function decodeJwt(token){
@@ -221,17 +164,54 @@
       "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")));
   }
 
-  function handleCredentialResponse(response){
-    const payload = decodeJwt(response.credential);
-    const errEl = document.getElementById("lgErr");
-    if (payload.hd !== DOMINIO_ESPERADO){
-      errEl.textContent = "Apenas contas @" + DOMINIO_ESPERADO + " podem acessar este painel.";
-      errEl.classList.add("show");
-      return;
+  function processarLoginCallback(){
+    if (!window.location.hash.includes("id_token") && !window.location.hash.includes("error")) return false;
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const idToken = hashParams.get("id_token");
+    const erroOauth = hashParams.get("error");
+    // Limpa o hash da URL imediatamente pra não deixar o token exposto/reprocessável
+    history.replaceState(null, "", window.location.pathname);
+
+    if (erroOauth) {
+      mostrarErroLogin("Login cancelado ou negado pelo Google (" + erroOauth + ").");
+      return true;
     }
+    if (!idToken) return false;
+
+    let payload;
+    try {
+      payload = decodeJwt(idToken);
+    } catch (e) {
+      mostrarErroLogin("Token de login inválido.");
+      return true;
+    }
+
+    const nonceEsperado = sessionStorage.getItem("oauth_nonce");
+    sessionStorage.removeItem("oauth_nonce");
+    if (payload.nonce !== nonceEsperado) {
+      mostrarErroLogin("Falha de segurança na validação do login (nonce). Tente novamente.");
+      return true;
+    }
+    if (payload.hd !== DOMINIO_ESPERADO) {
+      mostrarErroLogin("Apenas contas @" + DOMINIO_ESPERADO + " podem acessar este painel.");
+      return true;
+    }
+
+    concluirLogin(idToken, payload);
+    return true;
+  }
+
+  function mostrarErroLogin(msg){
+    document.getElementById("loginGate").classList.add("show");
+    const errEl = document.getElementById("lgErr");
+    errEl.textContent = msg;
+    errEl.classList.add("show");
+  }
+
+  function concluirLogin(idToken, payload){
     document.getElementById("loginGate").classList.remove("show");
     document.getElementById("dashboardContent").style.display = "block";
-    currentIdToken = response.credential;
+    currentIdToken = idToken;
     carregarDadosReais();
     const v = document.getElementById("introVideoCard");
     if (v){
@@ -246,6 +226,13 @@
       }
     }
   }
+
+  window.addEventListener("load", function(){
+    const veioDoLogin = processarLoginCallback();
+    if (!veioDoLogin) {
+      document.getElementById("loginGate").classList.add("show");
+    }
+  });
 
   function ativarSomCard(){
     const v = document.getElementById("introVideoCard");
@@ -262,9 +249,6 @@
 
   function fazerLogout(){
     currentIdToken = null;
-    if (typeof google !== "undefined" && google.accounts) {
-      google.accounts.id.disableAutoSelect();
-    }
     document.getElementById("dashboardContent").style.display = "none";
     document.getElementById("loginGate").classList.add("show");
     const errEl = document.getElementById("lgErr");
@@ -340,7 +324,10 @@
     <div class="lg-form-inner">
       <h3>Acesse o painel</h3>
       <p>Entre com seu e-mail corporativo Logcomex pra ver as informações.</p>
-      <div id="lgGoogleBtn"></div>
+      <button id="lgGoogleBtn" onclick="iniciarLoginGoogle()" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;border-radius:999px;border:1px solid var(--lx-border);background:#4285F4;color:#fff;font-family:'Poppins',sans-serif;font-weight:600;font-size:14.5px;cursor:pointer;box-shadow:var(--lx-shadow-sm);">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#fff" d="M21.35 11.1H12v2.95h5.35c-.25 1.3-1.6 3.8-5.35 3.8-3.2 0-5.85-2.65-5.85-5.95s2.65-5.95 5.85-5.95c1.85 0 3.05.8 3.75 1.45l2.55-2.45C16.85 3.1 14.65 2 12 2 6.9 2 2.75 6.15 2.75 11.25S6.9 20.5 12 20.5c6.35 0 8.75-4.45 8.75-6.75 0-.45-.05-.75-.1-1.05z"/></svg>
+        Entrar com Google
+      </button>
       <div class="lg-err" id="lgErr"></div>
       <div class="lg-note">Acesso restrito a colaboradores <b>@logcomex.com</b></div>
     </div>
