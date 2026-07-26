@@ -2,7 +2,12 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2D085D">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brindes">
 <title>Painel de Brindes — Facilities · Logcomex</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,6 +63,50 @@
   .ident-note{margin-top:14px;font-size:12px;color:var(--lx-fg-muted);background:var(--lx-off-white);border:1px solid var(--lx-border);border-radius:10px;padding:10px 14px;line-height:1.5;}
   .grid-main{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
   @media (max-width: 880px){ .grid-main{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(2,1fr);} .ident-grid{grid-template-columns:1fr;} }
+
+  /* ---- Modo app (celular/tablet) ---- */
+  #bottomNav{display:none;}
+  @media (max-width: 760px){
+    body{padding-bottom:78px;} /* espaço pra barra inferior não cobrir conteúdo */
+    header{position:sticky;top:0;background:var(--lx-off-white);z-index:40;padding:14px 0 10px;margin:0 -16px 16px;padding-left:16px;padding-right:16px;border-bottom:1px solid var(--lx-border);align-items:center;}
+    header h1{font-size:22px;}
+    header > div:last-child{display:none !important;} /* esconde os botões pill de topo, viram a barra inferior */
+    .wrap{padding:16px 16px 24px;}
+    #introCard{flex-direction:column;align-items:stretch;padding:16px;}
+    #introCard video{width:100% !important;height:auto !important;aspect-ratio:16/9;}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px;}
+    .card{padding:16px;border-radius:16px;}
+
+    /* Tabela vira lista de cards */
+    .table-scroll table, .table-scroll thead, .table-scroll tbody, .table-scroll th, .table-scroll td, .table-scroll tr{display:block;}
+    .table-scroll thead{display:none;}
+    .table-scroll tr{background:var(--lx-off-white);border-radius:14px;padding:12px 14px;margin-bottom:10px;position:relative;cursor:pointer;}
+    .table-scroll td{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border:none;font-size:13.5px;}
+    .table-scroll td::before{content:attr(data-label);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--lx-fg-muted);}
+    .table-scroll td[data-label=""]{position:absolute;top:10px;right:12px;padding:0;}
+    .table-scroll td[data-label=""]::before{content:"";}
+    .table-scroll td.id-cell::before{content:"";}
+    .table-scroll td.id-cell{position:absolute;top:10px;left:14px;font-size:11px;color:var(--lx-fg-muted);font-weight:600;}
+
+    .area-tab, .lupa-btn, button{min-height:38px;}
+    .search{min-height:40px;}
+  }
+
+  #bottomNav{
+    position:fixed;bottom:0;left:0;right:0;z-index:100;
+    background:#fff;border-top:1px solid var(--lx-border);
+    display:none;justify-content:space-around;align-items:center;
+    padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    box-shadow:0 -4px 16px rgba(11,13,25,.06);
+  }
+  #bottomNav button{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    background:none;border:none;color:var(--lx-fg-muted);font-size:10.5px;font-family:'Poppins',sans-serif;font-weight:600;
+    padding:6px 10px;border-radius:12px;cursor:pointer;flex:1;
+  }
+  #bottomNav button.active, #bottomNav button:active{color:var(--lx-primary-pure);background:var(--lx-primary-lightest);}
+  #bottomNav svg{width:21px;height:21px;}
+  @media (max-width: 760px){ #bottomNav{display:flex;} }
   .card h2{font-family:var(--lx-font-display);font-weight:600;font-size:16px;margin:0 0 14px;color:var(--lx-primary-darkest);}
   .controls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
   .area-tab{padding:8px 16px;border-radius:var(--lx-radius-pill);border:1px solid var(--lx-border);background:#fff;color:var(--lx-primary-darkest);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--lx-font-body);transition:all 200ms cubic-bezier(.2,.8,.2,1);}
@@ -654,6 +703,29 @@
   <footer>Dados de origem: Inventario_Brindes_LogComex · identidade visual: Logcomex Design System</footer>
 </div>
 
+<nav id="bottomNav">
+  <button onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+    Início
+  </button>
+  <button onclick="document.getElementById('scanCard').scrollIntoView({behavior:'smooth'}); setScanModo('camera');">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13" r="3"/></svg>
+    Escanear
+  </button>
+  <button onclick="abrirAlertas()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+    Alertas
+  </button>
+  <button onclick="abrirFinanceiro()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Financeiro
+  </button>
+  <button onclick="fazerLogout()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+    Sair
+  </button>
+</nav>
+
 <div class="modal-scrim" id="modalAlertaScrim" onclick="if(event.target===this) fecharAlertas()">
   <div class="modal-box" style="max-width:640px;">
     <button class="modal-close" onclick="fecharAlertas()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -844,14 +916,14 @@ function renderTabela(){
   }
   tbody.innerHTML = filtrados.map(([id, nome, area, saldo, minimo]) => {
     const s = situacao(saldo, minimo);
-    return `<tr>
-      <td class="id-cell">${id}</td>
-      <td>${nome}</td>
-      <td><span class="pill ${AREA_PILL[area]}">${area}</span></td>
-      <td>${saldo}</td>
-      <td>${minimo}</td>
-      <td><span class="pill ${s.cls}">${s.label}</span></td>
-      <td><button class="lupa-btn" onclick="abrirModal('${id}','${nome.replace(/'/g,"\\'")}','${area}')" aria-label="Ver QR e código de barras de ${nome}">
+    return `<tr onclick="if(window.innerWidth<=760) abrirModal('${id}','${nome.replace(/'/g,"\\'")}','${area}')">
+      <td class="id-cell" data-label="ID">${id}</td>
+      <td data-label="Item">${nome}</td>
+      <td data-label="Área"><span class="pill ${AREA_PILL[area]}">${area}</span></td>
+      <td data-label="Saldo">${saldo}</td>
+      <td data-label="Mín.">${minimo}</td>
+      <td data-label="Status"><span class="pill ${s.cls}">${s.label}</span></td>
+      <td data-label=""><button class="lupa-btn" onclick="event.stopPropagation(); abrirModal('${id}','${nome.replace(/'/g,"\\'")}','${area}')" aria-label="Ver QR e código de barras de ${nome}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       </button></td>
     </tr>`;
