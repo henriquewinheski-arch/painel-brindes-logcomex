@@ -62,12 +62,12 @@
   .ident-card p{font-size:12.5px;color:var(--lx-fg-muted);margin:0;line-height:1.5;}
   .ident-note{margin-top:14px;font-size:12px;color:var(--lx-fg-muted);background:var(--lx-off-white);border:1px solid var(--lx-border);border-radius:10px;padding:10px 14px;line-height:1.5;}
   .grid-main{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
-  @media (max-width: 880px){ .grid-main{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(2,1fr);} .ident-grid{grid-template-columns:1fr;} }
+  @media (max-width: 900px){ .grid-main{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(2,1fr);} .ident-grid{grid-template-columns:1fr;} }
 
   /* ---- Modo app (celular/tablet) ---- */
   #bottomNav{display:none;}
-  @media (max-width: 760px){
-    body{padding-bottom:78px;} /* espaço pra barra inferior não cobrir conteúdo */
+  @media (max-width: 900px){
+    body{padding-bottom:96px;} /* espaço pra barra inferior não cobrir conteúdo */
     header{position:sticky;top:0;background:var(--lx-off-white);z-index:40;padding:14px 0 10px;margin:0 -16px 16px;padding-left:16px;padding-right:16px;border-bottom:1px solid var(--lx-border);align-items:center;}
     header h1{font-size:22px;}
     header > div:last-child{display:none !important;} /* esconde os botões pill de topo, viram a barra inferior */
@@ -106,7 +106,7 @@
   }
   #bottomNav button.active, #bottomNav button:active{color:var(--lx-primary-pure);background:var(--lx-primary-lightest);}
   #bottomNav svg{width:21px;height:21px;}
-  @media (max-width: 760px){ #bottomNav{display:flex;} }
+  @media (max-width: 900px){ #bottomNav{display:flex;} }
   .card h2{font-family:var(--lx-font-display);font-weight:600;font-size:16px;margin:0 0 14px;color:var(--lx-primary-darkest);}
   .controls{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
   .area-tab{padding:8px 16px;border-radius:var(--lx-radius-pill);border:1px solid var(--lx-border);background:#fff;color:var(--lx-primary-darkest);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--lx-font-body);transition:all 200ms cubic-bezier(.2,.8,.2,1);}
@@ -168,7 +168,7 @@
   .lg-err{margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--chip-red-bg);color:var(--chip-red-fg);font-size:12.5px;display:none;}
   .lg-err.show{display:block;}
   #dashboardContent{display:none;}
-  @media (max-width: 760px){
+  @media (max-width: 900px){
     #loginGate.show{flex-direction:column;}
     .lg-hero{padding:36px 24px 44px;}
     .lg-hero .brand{position:static;margin-bottom:28px;}
