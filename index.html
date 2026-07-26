@@ -505,6 +505,7 @@ let scanCurrentId = null;
 let cameraStream = null;
 let cameraLoopId = null;
 let barcodeDetector = null;
+let cameraPausada = false;
 
 function showScanStatus(msg, kind){
   const el = document.getElementById("scanStatus");
@@ -535,6 +536,7 @@ function handleItemScan(code){
   const item = ITENS.find(i => i[0] === code);
   if (item){
     scanCurrentId = code;
+    cameraPausada = true;
     document.getElementById("listaCompleta").style.display = "none";
     document.getElementById("itemFocado").style.display = "block";
     document.getElementById("focadoNome").textContent = item[0] + " — " + item[1];
@@ -550,6 +552,7 @@ function handleItemScan(code){
 
 function cancelarFoco(){
   scanCurrentId = null;
+  cameraPausada = false;
   document.getElementById("itemFocado").style.display = "none";
   document.getElementById("listaCompleta").style.display = "block";
 }
@@ -595,6 +598,8 @@ function registrarScan(tipo){
     b.classList.toggle('active', b.dataset.area === areaFiltro);
   });
   scanCurrentId = null;
+  cameraPausada = false;
+  lastCameraScan = Date.now(); // evita reler o mesmo código imediatamente ao retomar
 
   renderKPIs();
   renderTabela();
@@ -626,16 +631,18 @@ async function ativarCamera(){
 let lastCameraScan = 0;
 async function loopDetectarCamera(video){
   if (!cameraStream) return;
-  try{
-    const codes = await barcodeDetector.detect(video);
-    if (codes.length > 0){
-      const now = Date.now();
-      if (now - lastCameraScan > 2000){
-        lastCameraScan = now;
-        handleItemScan(codes[0].rawValue);
+  if (!cameraPausada){
+    try{
+      const codes = await barcodeDetector.detect(video);
+      if (codes.length > 0){
+        const now = Date.now();
+        if (now - lastCameraScan > 2000){
+          lastCameraScan = now;
+          handleItemScan(codes[0].rawValue);
+        }
       }
-    }
-  } catch(e){ /* frame não decodificável, segue */ }
+    } catch(e){ /* frame não decodificável, segue */ }
+  }
   cameraLoopId = requestAnimationFrame(() => loopDetectarCamera(video));
 }
 
@@ -643,6 +650,7 @@ function pararCamera(){
   if (cameraLoopId) cancelAnimationFrame(cameraLoopId);
   if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
   cameraStream = null;
+  cameraPausada = false;
   const video = document.getElementById("scanVideo");
   if (video) video.style.display = "none";
 }
