@@ -139,6 +139,9 @@
   // ---- Login com Google ----
   const CLIENT_ID = "161510977968-oofrl3c78ijlt6t146lm35sdltdr4tdv.apps.googleusercontent.com";
   const DOMINIO_ESPERADO = "logcomex.com";
+  const CONSULTA_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-consulta";
+  const SCAN_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-scan";
+  let currentIdToken = null;
 
   window.addEventListener("load", function(){
     document.getElementById("loginGate").classList.add("show");
@@ -171,6 +174,8 @@
     }
     document.getElementById("loginGate").classList.remove("show");
     document.getElementById("dashboardContent").style.display = "block";
+    currentIdToken = response.credential;
+    carregarDadosReais();
     const v = document.getElementById("introVideoCard");
     if (v){
       v.muted = false;
@@ -196,6 +201,43 @@
     const v = document.getElementById("introVideoCard");
     v.pause();
     card.style.display = "none";
+  }
+
+  async function carregarDadosReais(){
+    try {
+      showScanStatus("Carregando dados reais do servidor...", "ok");
+      const res = await fetch(CONSULTA_URL);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      // Substitui o catálogo estático pelos dados reais (mantém saldo/mínimo atualizados)
+      ITENS.length = 0;
+      data.itens.forEach(i => {
+        ITENS.push([i.item_id, i.nome, i.area, i.saldo, i.minimo]);
+      });
+
+      // Substitui o histórico de teste pelas movimentações reais
+      ATIVIDADE_SEED.length = 0;
+      data.movimentos.forEach(m => {
+        const item = ITENS.find(i => i[0] === m.item_id);
+        ATIVIDADE_SEED.push({
+          data: new Date(m.data_hora).toLocaleString("pt-BR"),
+          item: m.item_id + " — " + (item ? item[1] : "?"),
+          tipo: m.tipo,
+          resp: m.responsavel,
+          obs: "Origem: " + (m.origem || "-")
+        });
+      });
+
+      showScanStatus("Dados reais carregados com sucesso.", "ok");
+      renderKPIs();
+      renderTabela();
+      renderAtividade();
+      renderGraficos();
+    } catch (e) {
+      console.error("Falha ao carregar dados reais:", e);
+      showScanStatus("Não foi possível carregar os dados do servidor. Mostrando dados da contagem inicial.", "err");
+    }
   }
 </script>
 
@@ -572,39 +614,54 @@ function changeScanQty(delta){
   inp.value = v;
 }
 
-function registrarScan(tipo){
+async function registrarScan(tipo){
   if (!scanCurrentId){ showScanStatus("Escaneie um item válido antes.", "err"); return; }
   const qtd = parseInt(document.getElementById("scanQtyInput").value, 10) || 1;
   const item = ITENS.find(i => i[0] === scanCurrentId);
-  if (tipo === "Saída") item[3] = Math.max(0, item[3] - qtd);
-  else item[3] = item[3] + qtd;
+  const itemIdParaRegistrar = scanCurrentId;
+  const areaDoItem = item[2];
 
-  showScanStatus(tipo + " de " + qtd + "x " + item[1] + " registrada. Novo saldo: " + item[3] + ".",
-    item[3] <= item[4] ? "warn" : "ok");
+  showScanStatus("Registrando " + tipo.toLowerCase() + " de " + qtd + "x " + item[1] + "...", "ok");
 
-  ATIVIDADE_SEED.unshift({
-    data: new Date().toLocaleString("pt-BR"),
-    item: item[0] + " — " + item[1],
-    tipo: tipo,
-    resp: "Teste local (sem login)",
-    obs: scanModo === "camera" ? "Lido via câmera" : "Lido via pistola/teclado"
-  });
+  try {
+    const res = await fetch(SCAN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken: currentIdToken,
+        itemId: itemIdParaRegistrar,
+        tipo: tipo,
+        quantidade: qtd
+      })
+    });
+    const resultado = await res.json();
 
-  // Volta pra lista completa, já filtrada pela área do item lido
-  document.getElementById("itemFocado").style.display = "none";
-  document.getElementById("listaCompleta").style.display = "block";
-  areaFiltro = item[2];
-  document.querySelectorAll('#listaCompleta .area-tab').forEach(b => {
-    b.classList.toggle('active', b.dataset.area === areaFiltro);
-  });
-  scanCurrentId = null;
-  cameraPausada = false;
-  lastCameraScan = Date.now(); // evita reler o mesmo código imediatamente ao retomar
+    if (!resultado.ok) {
+      showScanStatus("Erro ao registrar: " + (resultado.erro || "motivo desconhecido") + ".", "err");
+      return;
+    }
 
-  renderKPIs();
-  renderTabela();
-  renderAtividade();
-  renderGraficos();
+    showScanStatus(tipo + " de " + qtd + "x " + resultado.item + " registrada de verdade. Novo saldo: " + resultado.saldo + ".",
+      resultado.saldo <= resultado.minimo ? "warn" : "ok");
+
+    // Volta pra lista completa, já filtrada pela área do item lido
+    document.getElementById("itemFocado").style.display = "none";
+    document.getElementById("listaCompleta").style.display = "block";
+    areaFiltro = areaDoItem;
+    document.querySelectorAll('#listaCompleta .area-tab').forEach(b => {
+      b.classList.toggle('active', b.dataset.area === areaFiltro);
+    });
+    scanCurrentId = null;
+    cameraPausada = false;
+    lastCameraScan = Date.now(); // evita reler o mesmo código imediatamente ao retomar
+
+    // Recarrega os dados reais (saldo + histórico) direto do servidor
+    await carregarDadosReais();
+  } catch (e) {
+    console.error("Falha ao registrar movimentação:", e);
+    showScanStatus("Não foi possível conectar ao servidor pra registrar a movimentação.", "err");
+  }
+
   if (scanModo === "pistola") document.getElementById("scanInput").focus();
 }
 
