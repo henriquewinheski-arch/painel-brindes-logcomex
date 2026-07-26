@@ -178,7 +178,15 @@
     history.replaceState(null, "", window.location.pathname);
 
     if (erroOauth) {
-      mostrarErroLogin("Login cancelado ou negado pelo Google (" + erroOauth + ").");
+      // login_required/interaction_required/consent_required acontecem quando a tentativa
+      // silenciosa (pularVideo automático) não encontra sessão do Google ativa no aparelho —
+      // não é um erro real do usuário, só mostra a tela de login normal pra ele entrar uma vez.
+      const erroSilenciosoEsperado = ["login_required", "interaction_required", "consent_required"].includes(erroOauth);
+      if (!erroSilenciosoEsperado) {
+        mostrarErroLogin("Login cancelado ou negado pelo Google (" + erroOauth + ").");
+      } else {
+        document.getElementById("loginGate").classList.add("show");
+      }
       return true;
     }
 
@@ -189,7 +197,9 @@
       return true;
     }
 
-    mostrarProcessandoLogin();
+    const eraTentativaSilenciosa = sessionStorage.getItem("oauth_silencioso") === "1";
+    sessionStorage.removeItem("oauth_silencioso");
+    if (!eraTentativaSilenciosa) mostrarProcessandoLogin();
 
     try {
       const res = await fetch(OAUTH_EXCHANGE_URL, {
@@ -207,12 +217,39 @@
         mostrarErroLogin("Apenas contas @" + DOMINIO_ESPERADO + " podem acessar este painel.");
         return true;
       }
-      concluirLogin(resultado.id_token, payload);
+      salvarSessao(resultado.id_token, payload);
+      concluirLogin(resultado.id_token, payload, { pularVideo: eraTentativaSilenciosa });
     } catch (e) {
       console.error("Falha na troca do código OAuth:", e);
       mostrarErroLogin("Erro de conexão ao concluir o login. Tente novamente.");
     }
     return true;
+  }
+
+  function salvarSessao(idToken, payload){
+    localStorage.setItem("brindes_id_token", idToken);
+    localStorage.setItem("brindes_id_token_exp", String(payload.exp || 0));
+  }
+
+  function limparSessaoSalva(){
+    localStorage.removeItem("brindes_id_token");
+    localStorage.removeItem("brindes_id_token_exp");
+  }
+
+  function tentarLoginSilencioso(){
+    const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem("oauth_state", state);
+    sessionStorage.setItem("oauth_silencioso", "1");
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      scope: "openid email profile",
+      state: state,
+      hd: DOMINIO_ESPERADO,
+      prompt: "none"
+    });
+    window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
   }
 
   function mostrarProcessandoLogin(){
@@ -228,11 +265,13 @@
     errEl.classList.add("show");
   }
 
-  function concluirLogin(idToken, payload){
+  function concluirLogin(idToken, payload, opts){
+    opts = opts || {};
     document.getElementById("loginGate").classList.remove("show");
     document.getElementById("dashboardContent").style.display = "block";
     currentIdToken = idToken;
     carregarDadosReais();
+    if (opts.pularVideo) return; // sessão restaurada automaticamente — não repete o vídeo toda hora
     const v = document.getElementById("introVideoCard");
     if (v){
       v.muted = false;
@@ -241,7 +280,6 @@
         p.catch(() => {
           v.muted = true;
           v.play();
-          document.getElementById("introSomIcone").style.display = "flex";
         });
       }
     }
@@ -249,16 +287,37 @@
 
   window.addEventListener("load", async function(){
     const veioDoLogin = await processarLoginCallback();
-    if (!veioDoLogin) {
-      document.getElementById("loginGate").classList.add("show");
+    if (veioDoLogin) return;
+
+    // Sessão salva no aparelho ainda válida? Entra direto, sem tela de login nem vídeo de novo.
+    const tokenSalvo = localStorage.getItem("brindes_id_token");
+    const expSalvo = parseInt(localStorage.getItem("brindes_id_token_exp") || "0", 10);
+    const agora = Math.floor(Date.now() / 1000);
+    if (tokenSalvo && expSalvo > agora + 60) {
+      try {
+        const payload = decodeJwt(tokenSalvo);
+        concluirLogin(tokenSalvo, payload, { pularVideo: true });
+        return;
+      } catch (e) { limparSessaoSalva(); }
     }
+
+    // Sem sessão válida salva: tenta renovar sozinho em segundo plano (1x por aba),
+    // aproveitando se o navegador do aparelho já estiver com uma conta Google ativa.
+    if (!sessionStorage.getItem("silent_tentado")) {
+      sessionStorage.setItem("silent_tentado", "1");
+      tentarLoginSilencioso();
+      return;
+    }
+
+    document.getElementById("loginGate").classList.add("show");
   });
 
   function ativarSomCard(){
     const v = document.getElementById("introVideoCard");
-    v.muted = !v.muted;
-    document.getElementById("introSomIcone").style.display = v.muted ? "flex" : "none";
-    document.getElementById("introSomIcone").textContent = v.muted ? "🔇" : "🔊";
+    v.currentTime = 0;
+    v.muted = false;
+    v.play();
+    document.getElementById("introSomIcone").textContent = "🔊";
   }
 
   function fecharVideoCard(){
@@ -270,6 +329,8 @@
 
   function fazerLogout(){
     currentIdToken = null;
+    limparSessaoSalva();
+    sessionStorage.removeItem("silent_tentado");
     document.getElementById("dashboardContent").style.display = "none";
     document.getElementById("loginGate").classList.add("show");
     const errEl = document.getElementById("lgErr");
@@ -358,14 +419,14 @@
 
 <div class="wrap" id="dashboardContent">
   <div class="card" id="introCard" style="display:flex;gap:24px;align-items:center;padding:22px 26px;margin-bottom:26px;">
-    <div style="position:relative;flex-shrink:0;cursor:pointer;" onclick="ativarSomCard()" title="Toque pra ativar o som">
+    <div style="position:relative;flex-shrink:0;cursor:pointer;" onclick="ativarSomCard()" title="Toque pra assistir de novo com som">
       <video id="introVideoCard" src="intro.mp4" playsinline
         style="width:420px;height:236px;border-radius:16px;background:#000;object-fit:cover;display:block;"></video>
-      <div id="introSomIcone" style="display:none;position:absolute;bottom:14px;right:14px;width:38px;height:38px;border-radius:50%;background:rgba(11,13,25,.65);align-items:center;justify-content:center;color:#fff;font-size:18px;">🔇</div>
+      <div id="introSomIcone" style="display:flex;position:absolute;bottom:14px;right:14px;width:38px;height:38px;border-radius:50%;background:rgba(11,13,25,.65);align-items:center;justify-content:center;color:#fff;font-size:18px;">🔊</div>
     </div>
     <div style="flex:1;">
       <div style="font-family:var(--lx-font-display);font-size:19px;color:var(--lx-primary-darkest);font-weight:600;">Bem-vindo ao Controle de Brindes</div>
-      <div style="font-size:13.5px;color:var(--lx-fg-muted);margin-top:6px;">Vídeo de introdução rápido (10s). Toque no vídeo pra ativar o som, se necessário.</div>
+      <div style="font-size:13.5px;color:var(--lx-fg-muted);margin-top:6px;">Vídeo de introdução rápido (10s). Toque no vídeo pra assistir de novo com som.</div>
     </div>
     <button onclick="fecharVideoCard()" style="padding:8px 14px;border-radius:999px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:12.5px;cursor:pointer;white-space:nowrap;">Fechar</button>
   </div>
