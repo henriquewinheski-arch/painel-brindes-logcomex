@@ -357,15 +357,15 @@
 </div>
 
 <div class="wrap" id="dashboardContent">
-  <div class="card" id="introCard" style="display:flex;gap:20px;align-items:center;padding:18px 20px;">
+  <div class="card" id="introCard" style="display:flex;gap:24px;align-items:center;padding:22px 26px;margin-bottom:26px;">
     <div style="position:relative;flex-shrink:0;cursor:pointer;" onclick="ativarSomCard()" title="Toque pra ativar o som">
       <video id="introVideoCard" src="intro.mp4" playsinline
-        style="width:260px;height:146px;border-radius:14px;background:#000;object-fit:cover;display:block;"></video>
-      <div id="introSomIcone" style="display:none;position:absolute;bottom:10px;right:10px;width:32px;height:32px;border-radius:50%;background:rgba(11,13,25,.65);align-items:center;justify-content:center;color:#fff;font-size:15px;">🔇</div>
+        style="width:420px;height:236px;border-radius:16px;background:#000;object-fit:cover;display:block;"></video>
+      <div id="introSomIcone" style="display:none;position:absolute;bottom:14px;right:14px;width:38px;height:38px;border-radius:50%;background:rgba(11,13,25,.65);align-items:center;justify-content:center;color:#fff;font-size:18px;">🔇</div>
     </div>
     <div style="flex:1;">
-      <div style="font-family:var(--lx-font-display);font-size:16px;color:var(--lx-primary-darkest);font-weight:600;">Bem-vindo ao Controle de Brindes</div>
-      <div style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;">Vídeo de introdução rápido (10s). Toque no vídeo pra ativar o som, se necessário.</div>
+      <div style="font-family:var(--lx-font-display);font-size:19px;color:var(--lx-primary-darkest);font-weight:600;">Bem-vindo ao Controle de Brindes</div>
+      <div style="font-size:13.5px;color:var(--lx-fg-muted);margin-top:6px;">Vídeo de introdução rápido (10s). Toque no vídeo pra ativar o som, se necessário.</div>
     </div>
     <button onclick="fecharVideoCard()" style="padding:8px 14px;border-radius:999px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:12.5px;cursor:pointer;white-space:nowrap;">Fechar</button>
   </div>
@@ -415,7 +415,7 @@
   <div class="kpis">
     <div class="card kpi"><div class="label">Itens cadastrados</div><div class="value" id="kpiItens">—</div></div>
     <div class="card kpi"><div class="label">Unidades em estoque</div><div class="value" id="kpiUnidades">—</div></div>
-    <div class="card kpi alert"><div class="label">Itens em alerta</div><div class="value" id="kpiAlertas">—</div><div class="sub">estoque no mínimo ou abaixo</div></div>
+    <div class="card kpi alert" style="cursor:pointer;" onclick="abrirAlertas()"><div class="label">Itens em alerta</div><div class="value" id="kpiAlertas">—</div><div class="sub">estoque no mínimo ou abaixo · clique pra ver</div></div>
     <div class="card kpi"><div class="label">Áreas ativas</div><div class="value">3</div><div class="sub">Marketing · CS · Comercial</div></div>
   </div>
 
@@ -590,6 +590,15 @@
   </div>
 
   <footer>Dados de origem: Inventario_Brindes_LogComex · identidade visual: Logcomex Design System</footer>
+</div>
+
+<div class="modal-scrim" id="modalAlertaScrim" onclick="if(event.target===this) fecharAlertas()">
+  <div class="modal-box" style="max-width:640px;">
+    <button class="modal-close" onclick="fecharAlertas()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h3 style="margin-top:0;">Itens em alerta</h3>
+    <div class="modal-sub" id="alertaSubtitulo">—</div>
+    <div id="listaAlertas" style="margin-top:16px;max-height:420px;overflow-y:auto;"></div>
+  </div>
 </div>
 
 <div class="modal-scrim" id="modalScrim" onclick="if(event.target===this) fecharModal()">
@@ -795,6 +804,34 @@ function renderAtividade(){
     </div>
   `).join("");
 }
+function abrirAlertas(){
+  const itensAlerta = ITENS.filter(i => i[3] <= i[4])
+    .sort((a, b) => (a[3] - a[4]) - (b[3] - b[4]));
+
+  document.getElementById("alertaSubtitulo").textContent =
+    itensAlerta.length + " item" + (itensAlerta.length === 1 ? "" : "s") + " no estoque mínimo ou abaixo.";
+
+  document.getElementById("listaAlertas").innerHTML = itensAlerta.length ? itensAlerta.map(([id, nome, area, saldo, minimo]) => {
+    const critico = saldo === 0;
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--lx-border);">
+      <div>
+        <div style="font-weight:600;color:var(--lx-fg);">${nome} <span style="font-weight:400;color:var(--lx-fg-muted);font-size:12.5px;">(${id})</span></div>
+        <div style="font-size:12.5px;color:var(--lx-fg-muted);margin-top:2px;">Área: ${area} · Saldo ${saldo} / Mínimo ${minimo}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="padding:4px 10px;border-radius:999px;font-size:11.5px;font-weight:700;background:${critico ? 'var(--chip-red-bg)' : 'var(--chip-orange-bg)'};color:${critico ? 'var(--chip-red-fg)' : 'var(--chip-orange-fg)'};">${critico ? 'ESGOTADO' : 'REPOR'}</span>
+        <button onclick="fecharAlertas(); abrirModal('${id}', '${nome.replace(/'/g, "\\'")}', '${area}')" style="padding:6px 12px;border-radius:999px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-primary-darkest);font-size:12px;cursor:pointer;">Ver QR</button>
+      </div>
+    </div>`;
+  }).join("") : `<div style="text-align:center;color:var(--lx-fg-muted);padding:24px 0;">Nenhum item em alerta no momento.</div>`;
+
+  document.getElementById("modalAlertaScrim").classList.add("show");
+}
+function fecharAlertas(){
+  document.getElementById("modalAlertaScrim").classList.remove("show");
+}
+
 function abrirModal(id, nome, area){
   document.getElementById("modalNome").textContent = nome;
   document.getElementById("modalMeta").textContent = id + " · " + area;
@@ -806,7 +843,7 @@ function abrirModal(id, nome, area){
   }
 }
 function fecharModal(){ document.getElementById("modalScrim").classList.remove("show"); }
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { fecharModal(); fecharGraficos(); fecharFinanceiro(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { fecharModal(); fecharGraficos(); fecharFinanceiro(); fecharAlertas(); } });
 document.querySelectorAll("#listaCompleta .area-tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#listaCompleta .area-tab").forEach(b => b.classList.remove("active"));
