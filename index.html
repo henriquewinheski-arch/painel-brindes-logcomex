@@ -145,7 +145,10 @@
 
   window.addEventListener("load", function(){
     document.getElementById("loginGate").classList.add("show");
-    if (typeof google === "undefined") return;
+    if (typeof google === "undefined") {
+      mostrarAvisoWebView();
+      return;
+    }
     google.accounts.id.initialize({
       client_id: CLIENT_ID,
       hosted_domain: DOMINIO_ESPERADO,
@@ -156,7 +159,24 @@
       document.getElementById("lgGoogleBtn"),
       { theme: "filled_blue", size: "large", text: "signin_with", shape: "pill" }
     );
+    // Se o botão não renderizar em ~2s, provavelmente é um WebView bloqueado pelo Google (ex: Fully Kiosk)
+    setTimeout(() => {
+      if (!document.getElementById("lgGoogleBtn").querySelector("div[role='button']")) {
+        mostrarAvisoWebView();
+      }
+    }, 2000);
   });
+
+  function mostrarAvisoWebView(){
+    const btnBox = document.getElementById("lgGoogleBtn");
+    btnBox.innerHTML = `<div style="background:var(--chip-orange-bg,#FEE5CC);color:var(--chip-orange-fg,#CB6700);border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.5;text-align:left;">
+      <b>O login do Google não carregou.</b><br>
+      Se estiver no <b>Fully Kiosk Browser</b>: vá em <b>Configurações → Configurações de conteúdo web</b> e ative
+      <b>"Usar Chrome Custom Tabs"</b> (ou "Enable Google Sign-In"). O Google bloqueia login dentro de WebViews comuns por segurança.
+      Depois de ativar, recarregue esta página.
+    </div>`;
+  }
+
 
   function decodeJwt(token){
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -201,6 +221,17 @@
     const v = document.getElementById("introVideoCard");
     v.pause();
     card.style.display = "none";
+  }
+
+  function fazerLogout(){
+    currentIdToken = null;
+    if (typeof google !== "undefined" && google.accounts) {
+      google.accounts.id.disableAutoSelect();
+    }
+    document.getElementById("dashboardContent").style.display = "none";
+    document.getElementById("loginGate").classList.add("show");
+    const errEl = document.getElementById("lgErr");
+    if (errEl) errEl.classList.remove("show");
   }
 
   async function carregarDadosReais(){
@@ -317,10 +348,16 @@
       <h1>Painel de Brindes</h1>
       <div class="updated">Contagem física de 25/07/2026 · 84 itens · CS, Comercial e Marketing (inclui vestuário)</div>
     </div>
+    <div style="display:flex;gap:10px;">
     <button onclick="abrirGraficos()" style="display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--lx-radius-pill);border:1px solid var(--lx-border);background:#fff;color:var(--lx-primary-darkest);font-weight:600;font-size:13px;cursor:pointer;font-family:var(--lx-font-body);box-shadow:var(--lx-shadow-sm);">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-5"/></svg>
       Gráficos
     </button>
+    <button onclick="fazerLogout()" style="display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--lx-radius-pill);border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-weight:600;font-size:13px;cursor:pointer;font-family:var(--lx-font-body);box-shadow:var(--lx-shadow-sm);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Sair
+    </button>
+    </div>
   </header>
 
   <div class="kpis">
@@ -419,6 +456,13 @@
     <div class="modal-box" style="max-width:900px;">
       <button class="modal-close" onclick="fecharGraficos()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       <h2 style="margin-top:0;">Visão geral do estoque</h2>
+      <div class="controls" style="margin-bottom:6px;">
+        <button class="area-tab active" data-graf-area="Todos" onclick="filtrarGraficos('Todos')">Todos</button>
+        <button class="area-tab" data-graf-area="Marketing" onclick="filtrarGraficos('Marketing')">Marketing</button>
+        <button class="area-tab" data-graf-area="CS" onclick="filtrarGraficos('CS')">CS</button>
+        <button class="area-tab" data-graf-area="Comercial" onclick="filtrarGraficos('Comercial')">Comercial</button>
+      </div>
+      <div id="graficoSubtitulo" style="font-size:12.5px;color:var(--lx-fg-muted);margin-bottom:18px;"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
         <div>
           <h3 style="font-family:var(--lx-font-display);font-size:13px;color:var(--lx-fg-muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:.04em;">Status geral</h3>
@@ -428,7 +472,7 @@
           </div>
         </div>
         <div>
-          <h3 style="font-family:var(--lx-font-display);font-size:13px;color:var(--lx-fg-muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:.04em;">Saldo por área</h3>
+          <h3 id="tituloBarArea" style="font-family:var(--lx-font-display);font-size:13px;color:var(--lx-fg-muted);margin:0 0 12px;text-transform:uppercase;letter-spacing:.04em;">Saldo por área <span style="opacity:.6;font-weight:400;text-transform:none;">(clique pra filtrar)</span></h3>
           <div id="barArea"></div>
         </div>
       </div>
@@ -720,15 +764,34 @@ function fecharGraficos(){
   document.getElementById("modalGraficosScrim").classList.remove("show");
 }
 
+let graficoAreaFiltro = "Todos";
+
+function filtrarGraficos(area){
+  graficoAreaFiltro = area;
+  document.querySelectorAll('#modalGraficosScrim .area-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.grafArea === area);
+  });
+  renderGraficos();
+}
+
 function renderGraficos(){
+  const itensFiltrados = graficoAreaFiltro === "Todos" ? ITENS : ITENS.filter(i => i[2] === graficoAreaFiltro);
+
+  const subtitulo = document.getElementById("graficoSubtitulo");
+  if (subtitulo){
+    subtitulo.textContent = graficoAreaFiltro === "Todos"
+      ? `Mostrando os ${ITENS.length} itens de todas as áreas.`
+      : `Mostrando ${itensFiltrados.length} itens da área ${graficoAreaFiltro}. Clique em "Todos" pra voltar.`;
+  }
+
   const statusCount = { ok: 0, atencao: 0, repor: 0 };
-  ITENS.forEach(([,,,saldo,minimo]) => {
+  itensFiltrados.forEach(([,,,saldo,minimo]) => {
     const s = situacao(saldo, minimo);
     if (s.label === "OK") statusCount.ok++;
     else if (s.label === "Atenção") statusCount.atencao++;
     else statusCount.repor++;
   });
-  const total = ITENS.length;
+  const total = itensFiltrados.length || 1;
   const pOk = (statusCount.ok / total) * 100;
   const pAt = (statusCount.atencao / total) * 100;
   const donut = document.getElementById("donutStatus");
@@ -737,50 +800,76 @@ function renderGraficos(){
     var(--chip-orange-fg) ${pOk}% ${pOk+pAt}%,
     var(--chip-red-fg) ${pOk+pAt}% 100%)`;
   donut.style.position = "relative";
-  donut.innerHTML = `<div style="position:absolute;inset:18px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--lx-font-display);font-size:22px;font-weight:700;color:var(--lx-primary-darkest);">${total}</div>`;
+  donut.innerHTML = `<div style="position:absolute;inset:18px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--lx-font-display);font-size:22px;font-weight:700;color:var(--lx-primary-darkest);">${itensFiltrados.length}</div>`;
   document.getElementById("donutLegend").innerHTML = `
     <div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--chip-green-fg);margin-right:6px;"></span>OK — ${statusCount.ok}</div>
     <div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--chip-orange-fg);margin-right:6px;"></span>Atenção — ${statusCount.atencao}</div>
     <div><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--chip-red-fg);margin-right:6px;"></span>Repor — ${statusCount.repor}</div>
   `;
 
-  const porArea = {};
-  ITENS.forEach(([,,area,saldo]) => { porArea[area] = (porArea[area]||0) + saldo; });
-  const maxArea = Math.max(...Object.values(porArea));
+  const tituloBarArea = document.getElementById("tituloBarArea");
   const areaColors = { "Marketing": "var(--chip-purple-fg)", "CS": "var(--lx-fg-muted)", "Comercial": "var(--lx-primary-darkest)" };
-  document.getElementById("barArea").innerHTML = Object.entries(porArea)
-    .sort((a,b) => b[1]-a[1])
-    .map(([area, tot]) => `
+
+  if (graficoAreaFiltro === "Todos"){
+    tituloBarArea.innerHTML = `Saldo por área <span style="opacity:.6;font-weight:400;text-transform:none;">(clique pra filtrar)</span>`;
+    const porArea = {};
+    ITENS.forEach(([,,area,saldo]) => { porArea[area] = (porArea[area]||0) + saldo; });
+    const maxArea = Math.max(...Object.values(porArea));
+    document.getElementById("barArea").innerHTML = Object.entries(porArea)
+      .sort((a,b) => b[1]-a[1])
+      .map(([area, tot]) => `
+        <div class="bar-row" style="cursor:pointer;" onclick="filtrarGraficos('${area}')">
+          <div class="bar-label">${area}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(tot/maxArea*100)}%;background:${areaColors[area]||'var(--lx-primary-pure)'}"></div></div>
+          <div class="bar-value">${tot.toLocaleString("pt-BR")}</div>
+        </div>`).join("");
+  } else {
+    tituloBarArea.innerHTML = `Saldo por categoria <span style="opacity:.6;font-weight:400;text-transform:none;">em ${graficoAreaFiltro}</span>`;
+    const porCategoria = {};
+    itensFiltrados.forEach(i => {
+      const categoria = i[1].startsWith("Camiseta") ? "Vestuário" : "Brinde";
+      porCategoria[categoria] = (porCategoria[categoria] || 0) + i[3];
+    });
+    const maxCat = Math.max(...Object.values(porCategoria), 1);
+    const catColors = { "Brinde": "var(--chip-purple-fg)", "Vestuário": "var(--lx-primary-darkest)" };
+    document.getElementById("barArea").innerHTML = Object.entries(porCategoria)
+      .sort((a,b) => b[1]-a[1])
+      .map(([cat, tot]) => `
+        <div class="bar-row">
+          <div class="bar-label">${cat}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(tot/maxCat*100)}%;background:${catColors[cat]||'var(--lx-primary-pure)'}"></div></div>
+          <div class="bar-value">${tot.toLocaleString("pt-BR")}</div>
+        </div>`).join("") || `<div style="font-size:12.5px;color:var(--lx-fg-muted);">Sem itens nesta área.</div>`;
+  }
+
+  const top10 = [...itensFiltrados].sort((a,b) => b[3]-a[3]).slice(0, 10);
+  document.getElementById("barTop10").innerHTML = top10.length ? (() => {
+    const maxTop = top10[0][3];
+    return top10.map(([id, nome, area, saldo]) => `
       <div class="bar-row">
-        <div class="bar-label">${area}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(tot/maxArea*100)}%;background:${areaColors[area]||'var(--lx-primary-pure)'}"></div></div>
-        <div class="bar-value">${tot.toLocaleString("pt-BR")}</div>
+        <div class="bar-label" title="${nome}">${nome}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(saldo/maxTop*100)}%;background:var(--lx-primary-pure)"></div></div>
+        <div class="bar-value">${saldo.toLocaleString("pt-BR")}</div>
       </div>`).join("");
+  })() : `<div style="font-size:12.5px;color:var(--lx-fg-muted);">Sem itens nesta área.</div>`;
 
-  const top10 = [...ITENS].sort((a,b) => b[3]-a[3]).slice(0, 10);
-  const maxTop = top10[0][3];
-  document.getElementById("barTop10").innerHTML = top10.map(([id, nome, area, saldo]) => `
-    <div class="bar-row">
-      <div class="bar-label" title="${nome}">${nome}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(saldo/maxTop*100)}%;background:var(--lx-primary-pure)"></div></div>
-      <div class="bar-value">${saldo.toLocaleString("pt-BR")}</div>
-    </div>`).join("");
-
-  const criticos = [...ITENS]
+  const criticos = [...itensFiltrados]
     .map(([id, nome, area, saldo, minimo]) => ({ id, nome, area, saldo, minimo }))
     .sort((a,b) => (a.saldo - a.minimo) - (b.saldo - b.minimo))
     .slice(0, 8);
-  const maxMinimoCrit = Math.max(...criticos.map(c => Math.max(c.minimo, c.saldo, 1)));
-  document.getElementById("barCriticos").innerHTML = criticos.map(c => {
-    const s = situacao(c.saldo, c.minimo);
-    const color = s.label === "Repor" ? "var(--chip-red-fg)" : s.label === "Atenção" ? "var(--chip-orange-fg)" : "var(--chip-green-fg)";
-    return `
-    <div class="bar-row">
-      <div class="bar-label" title="${c.nome}">${c.nome}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(c.saldo/maxMinimoCrit*100)}%;background:${color}"></div></div>
-      <div class="bar-value">${c.saldo}/${c.minimo}</div>
-    </div>`;
-  }).join("");
+  document.getElementById("barCriticos").innerHTML = criticos.length ? (() => {
+    const maxMinimoCrit = Math.max(...criticos.map(c => Math.max(c.minimo, c.saldo, 1)));
+    return criticos.map(c => {
+      const s = situacao(c.saldo, c.minimo);
+      const color = s.label === "Repor" ? "var(--chip-red-fg)" : s.label === "Atenção" ? "var(--chip-orange-fg)" : "var(--chip-green-fg)";
+      return `
+      <div class="bar-row">
+        <div class="bar-label" title="${c.nome}">${c.nome}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(c.saldo/maxMinimoCrit*100)}%;background:${color}"></div></div>
+        <div class="bar-value">${c.saldo}/${c.minimo}</div>
+      </div>`;
+    }).join("");
+  })() : `<div style="font-size:12.5px;color:var(--lx-fg-muted);">Sem itens nesta área.</div>`;
 }
 
 renderKPIs();
