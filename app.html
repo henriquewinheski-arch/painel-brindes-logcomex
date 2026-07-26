@@ -150,13 +150,13 @@
   </div>
 
   <div class="config-note">
-    ✅ Login com Google já está configurado e funcionando. Falta só substituir <code>SUA_URL_APPS_SCRIPT</code> no código deste arquivo pela URL gerada no deploy do Apps Script, pra baixa/reposição gravar de verdade na planilha.
+    ✅ Login com Google e backend (n8n) já configurados e funcionando. Cada leitura confirmada grava de verdade o saldo e o histórico — sem Google Sheets, tudo no n8n.
   </div>
   </div>
 
 <script>
 const CLIENT_ID = "161510977968-oofrl3c78ijlt6t146lm35sdltdr4tdv.apps.googleusercontent.com";
-const APPS_SCRIPT_URL = "SUA_URL_APPS_SCRIPT/exec";
+const APPS_SCRIPT_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-scan";
 const DOMINIO_ESPERADO = "logcomex.com";
 
 let currentIdToken = null;
