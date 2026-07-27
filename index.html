@@ -394,6 +394,7 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
       window.escopoUsuarioAtual = data.escopo || "Global";
+      window.papelUsuarioAtual = data.papel || "Operador";
 
       // Substitui o catálogo estático pelos dados reais (mantém saldo/mínimo atualizados)
       ITENS.length = 0;
@@ -421,6 +422,7 @@
       renderAtividade();
       renderGraficos();
       aplicarEscopoUI(window.escopoUsuarioAtual);
+      aplicarModoQuiosque(window.papelUsuarioAtual);
       renderFinanceiro();
     } catch (e) {
       console.error("Falha ao carregar dados reais:", e);
@@ -1000,6 +1002,45 @@ function aplicarEscopoUI(escopo){
   if (typeof filtrarGraficos === "function") filtrarGraficos(escopo);
   if (typeof filtrarFinanceiro === "function") filtrarFinanceiro(escopo);
 }
+function aplicarModoQuiosque(papel){
+  if (papel !== "Quiosque") return; // perfil normal: nada muda
+
+  // Esconde os botões de Gráficos, Financeiro e Sair no cabeçalho
+  document.querySelectorAll('header button[onclick^="abrirGraficos"], header button[onclick^="abrirFinanceiro"], header button[onclick^="fazerLogout"]')
+    .forEach(b => b.style.display = "none");
+
+  // Esconde os cards de KPI e o bloco explicativo de identificação (fica só o de leitura/baixa)
+  document.querySelector(".kpis").style.display = "none";
+  document.querySelectorAll(".ident-section").forEach(el => {
+    if (el.id !== "scanCard") el.style.display = "none";
+  });
+
+  // Esconde a tabela completa e as últimas movimentações — só a leitura/baixa fica visível
+  document.querySelector(".grid-main").style.display = "none";
+
+  // Some com o vídeo de intro pra não atrapalhar o uso contínuo do tablet fixo
+  const introCard = document.getElementById("introCard");
+  if (introCard) introCard.style.display = "none";
+}
+
+async function manterTelaAtiva(){
+  // Melhor esforço pra não deixar a tela apagar sozinha (Wake Lock API).
+  // Mesmo assim, desative o bloqueio automático de tela e o modo economia
+  // de energia nas configurações do próprio tablet, pra garantir 100%.
+  if (!("wakeLock" in navigator)) return;
+  try {
+    let sentinel = await navigator.wakeLock.request("screen");
+    document.addEventListener("visibilitychange", async () => {
+      if (sentinel.released && document.visibilityState === "visible") {
+        try { sentinel = await navigator.wakeLock.request("screen"); } catch (e) {}
+      }
+    });
+  } catch (e) {
+    console.warn("Wake Lock indisponível:", e);
+  }
+}
+manterTelaAtiva();
+
 document.querySelectorAll("#listaCompleta .area-tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#listaCompleta .area-tab").forEach(b => b.classList.remove("active"));
