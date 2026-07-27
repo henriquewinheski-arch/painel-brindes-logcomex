@@ -1005,18 +1005,22 @@ function aplicarEscopoUI(escopo){
 function aplicarModoQuiosque(papel){
   if (papel !== "Quiosque") return; // perfil normal: nada muda
 
-  // Esconde os botões de Gráficos, Financeiro e Sair no cabeçalho
+  // Esconde os botões de Gráficos, Financeiro e Sair no cabeçalho (versão desktop)
   document.querySelectorAll('header button[onclick^="abrirGraficos"], header button[onclick^="abrirFinanceiro"], header button[onclick^="fazerLogout"]')
     .forEach(b => b.style.display = "none");
 
-  // Esconde os cards de KPI e o bloco explicativo de identificação (fica só o de leitura/baixa)
+  // Esconde Alertas e Financeiro na barra de navegação de baixo (versão mobile/tablet)
+  const bottomNav = document.getElementById("bottomNav");
+  if (bottomNav) {
+    bottomNav.querySelectorAll('button[onclick^="abrirAlertas"], button[onclick^="abrirFinanceiro"]')
+      .forEach(b => b.style.display = "none");
+  }
+
+  // Esconde os cards de KPI e o bloco explicativo de identificação (fica a listagem de itens + leitura/baixa)
   document.querySelector(".kpis").style.display = "none";
   document.querySelectorAll(".ident-section").forEach(el => {
     if (el.id !== "scanCard") el.style.display = "none";
   });
-
-  // Esconde a tabela completa e as últimas movimentações — só a leitura/baixa fica visível
-  document.querySelector(".grid-main").style.display = "none";
 
   // Some com o vídeo de intro pra não atrapalhar o uso contínuo do tablet fixo
   const introCard = document.getElementById("introCard");
