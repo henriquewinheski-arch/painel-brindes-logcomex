@@ -389,9 +389,11 @@
   async function carregarDadosReais(){
     try {
       showScanStatus("Carregando dados reais do servidor...", "ok");
-      const res = await fetch(CONSULTA_URL);
+      const tokenParaConsulta = currentIdToken || localStorage.getItem("brindes_id_token");
+      const res = await fetch(CONSULTA_URL + "?idToken=" + encodeURIComponent(tokenParaConsulta));
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
+      window.escopoUsuarioAtual = data.escopo || "Global";
 
       // Substitui o catálogo estático pelos dados reais (mantém saldo/mínimo atualizados)
       ITENS.length = 0;
@@ -418,6 +420,7 @@
       renderTabela();
       renderAtividade();
       renderGraficos();
+      aplicarEscopoUI(window.escopoUsuarioAtual);
       renderFinanceiro();
     } catch (e) {
       console.error("Falha ao carregar dados reais:", e);
@@ -978,6 +981,25 @@ function abrirModal(id, nome, area){
 }
 function fecharModal(){ document.getElementById("modalScrim").classList.remove("show"); }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { fecharModal(); fecharGraficos(); fecharFinanceiro(); fecharAlertas(); } });
+function aplicarEscopoUI(escopo){
+  if (!escopo || escopo === "Global") return; // vê tudo, nada a esconder
+
+  // Esconde a aba "Todos" e qualquer área diferente da permitida nos 3 grupos de filtro
+  document.querySelectorAll(".area-tab[data-area], .area-tab[data-graf-area], .area-tab[data-fin-area]").forEach(btn => {
+    const area = btn.dataset.area || btn.dataset.grafArea || btn.dataset.finArea;
+    if (area !== escopo) btn.style.display = "none";
+  });
+
+  // Trava a visão na área do usuário em vez de "Todos"
+  areaFiltro = escopo;
+  document.querySelectorAll("#listaCompleta .area-tab").forEach(b => b.classList.remove("active"));
+  const tabTabela = document.querySelector('#listaCompleta .area-tab[data-area="' + escopo + '"]');
+  if (tabTabela) tabTabela.classList.add("active");
+  renderTabela();
+
+  if (typeof filtrarGraficos === "function") filtrarGraficos(escopo);
+  if (typeof filtrarFinanceiro === "function") filtrarFinanceiro(escopo);
+}
 document.querySelectorAll("#listaCompleta .area-tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#listaCompleta .area-tab").forEach(b => b.classList.remove("active"));
