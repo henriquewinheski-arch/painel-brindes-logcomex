@@ -560,7 +560,7 @@
     <div id="painelScanPistola">
       <div style="display:flex;align-items:center;gap:10px;background:var(--lx-primary-darkest);border-radius:12px;padding:14px 16px;">
         <span style="width:9px;height:9px;border-radius:50%;background:var(--lx-secondary-pure);flex-shrink:0;"></span>
-        <input id="scanInput" type="text" placeholder="Aponte a pistola e puxe o gatilho, ou digite o ID (ex: BRD-0003)..." autofocus
+        <input id="scanInput" type="text" inputmode="none" placeholder="Aponte a pistola e puxe o gatilho, ou digite o ID (ex: BRD-0003)..." autofocus
           style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-family:var(--lx-font-body);font-size:14px;">
       </div>
     </div>
@@ -586,7 +586,7 @@
           <div id="focadoMeta" style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;">—</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:18px;">
             <button onclick="changeScanQty(-1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">−</button>
-            <input id="scanQtyInput" type="number" value="1" min="1" style="width:64px;text-align:center;padding:9px;border-radius:8px;border:1px solid var(--lx-border);font-size:15px;">
+            <input id="scanQtyInput" type="number" inputmode="none" value="1" min="1" style="width:64px;text-align:center;padding:9px;border-radius:8px;border:1px solid var(--lx-border);font-size:15px;">
             <button onclick="changeScanQty(1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">+</button>
           </div>
           <div style="display:flex;gap:10px;margin-top:16px;">
@@ -603,7 +603,7 @@
         <button class="area-tab" data-area="Marketing">Marketing</button>
         <button class="area-tab" data-area="CS">CS</button>
         <button class="area-tab" data-area="Comercial">Comercial</button>
-        <input class="search" id="searchInput" type="text" placeholder="Buscar item ou ID...">
+        <input class="search" id="searchInput" type="text" inputmode="none" placeholder="Buscar item ou ID...">
       </div>
       <div class="table-scroll">
         <table>
@@ -731,6 +731,22 @@
   </button>
 </nav>
 
+<button id="btnVoltarGlobal" onclick="acaoVoltarGlobal()" style="display:none;position:fixed;left:16px;top:16px;z-index:400;align-items:center;gap:6px;padding:12px 20px;border-radius:999px;border:none;background:var(--lx-primary-darkest);color:#fff;font-weight:700;font-size:15px;font-family:var(--lx-font-body);box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+  Voltar
+</button>
+
+<div id="tecladoVirtualScrim" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:500;background:#fff;border-top:1px solid var(--lx-border);box-shadow:0 -10px 28px rgba(0,0,0,.18);padding:14px 14px calc(14px + env(safe-area-inset-bottom));">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div id="tecladoAlvoLabel" style="font-size:12.5px;color:var(--lx-fg-muted);font-weight:600;"></div>
+    <button type="button" onclick="fecharTecladoVirtual()" style="background:none;border:none;color:var(--lx-fg-muted);cursor:pointer;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div id="tecladoTeclas" style="display:flex;flex-direction:column;gap:7px;"></div>
+  <button type="button" onclick="concluirTecladoVirtual()" style="margin-top:10px;width:100%;padding:14px;border-radius:10px;border:none;background:var(--lx-primary-pure);color:#fff;font-weight:700;font-size:15px;cursor:pointer;">Concluir</button>
+</div>
+
 <div class="modal-scrim" id="modalAlertaScrim" onclick="if(event.target===this) fecharAlertas()">
   <div class="modal-box" style="max-width:640px;">
     <button class="modal-close" onclick="fecharAlertas()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -774,9 +790,11 @@ let financeiroAreaFiltro = "Todos";
 function abrirFinanceiro(){
   renderFinanceiro();
   document.getElementById("modalFinanceiroScrim").classList.add("show");
+  marcarOverlayAberto();
 }
 function fecharFinanceiro(){
   document.getElementById("modalFinanceiroScrim").classList.remove("show");
+  marcarOverlayFechado();
 }
 function filtrarFinanceiro(area){
   financeiroAreaFiltro = area;
@@ -966,9 +984,11 @@ function abrirAlertas(){
   }).join("") : `<div style="text-align:center;color:var(--lx-fg-muted);padding:24px 0;">Nenhum item em alerta no momento.</div>`;
 
   document.getElementById("modalAlertaScrim").classList.add("show");
+  marcarOverlayAberto();
 }
 function fecharAlertas(){
   document.getElementById("modalAlertaScrim").classList.remove("show");
+  marcarOverlayFechado();
 }
 
 function abrirModal(id, nome, area){
@@ -980,9 +1000,128 @@ function abrirModal(id, nome, area){
     document.getElementById("modalQr").src = "data:image/png;base64," + codigos.qr;
     document.getElementById("modalBarcode").src = "data:image/png;base64," + codigos.bc;
   }
+  marcarOverlayAberto();
 }
-function fecharModal(){ document.getElementById("modalScrim").classList.remove("show"); }
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { fecharModal(); fecharGraficos(); fecharFinanceiro(); fecharAlertas(); } });
+function fecharModal(){
+  document.getElementById("modalScrim").classList.remove("show");
+  marcarOverlayFechado();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { fecharModal(); fecharGraficos(); fecharFinanceiro(); fecharAlertas(); fecharTecladoVirtual(); } });
+
+// ===== Botão "Voltar" único, funciona igual no PC, celular e tablet =====
+// Também responde ao botão/gesto de voltar do navegador ou do Android (history).
+let overlayAberto = false;
+
+function marcarOverlayAberto(){
+  if (!overlayAberto){
+    overlayAberto = true;
+    history.pushState({ overlayLogcomex: true }, "");
+  }
+  const btn = document.getElementById("btnVoltarGlobal");
+  if (btn) btn.style.display = "flex";
+}
+
+function marcarOverlayFechado(){
+  overlayAberto = false;
+  const btn = document.getElementById("btnVoltarGlobal");
+  if (btn) btn.style.display = "none";
+}
+
+function fecharTudoAberto(){
+  fecharModal();
+  fecharGraficos();
+  fecharFinanceiro();
+  fecharAlertas();
+  fecharTecladoVirtual();
+}
+
+function acaoVoltarGlobal(){
+  fecharTudoAberto();
+  if (history.state && history.state.overlayLogcomex) history.back();
+}
+
+window.addEventListener("popstate", () => {
+  fecharTudoAberto();
+});
+
+// ===== Teclado virtual próprio (melhor que o teclado nativo do tablet) =====
+const TECLADO_LAYOUT_TEXTO = [
+  ["1","2","3","4","5","6","7","8","9","0"],
+  ["Q","W","E","R","T","Y","U","I","O","P"],
+  ["A","S","D","F","G","H","J","K","L","-"],
+  ["Z","X","C","V","B","N","M","⌫"]
+];
+const TECLADO_LAYOUT_NUMERO = [
+  ["1","2","3"],
+  ["4","5","6"],
+  ["7","8","9"],
+  ["C","0","⌫"]
+];
+let tecladoAlvoInput = null;
+
+function abrirTecladoVirtual(inputEl, modo){
+  tecladoAlvoInput = inputEl;
+  const layout = modo === "numero" ? TECLADO_LAYOUT_NUMERO : TECLADO_LAYOUT_TEXTO;
+  const cont = document.getElementById("tecladoTeclas");
+  cont.innerHTML = "";
+  layout.forEach(linha => {
+    const divLinha = document.createElement("div");
+    divLinha.style.cssText = "display:flex;gap:6px;justify-content:center;";
+    linha.forEach(tecla => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = tecla;
+      btn.style.cssText = "flex:1;max-width:68px;padding:15px 0;border-radius:9px;border:1px solid var(--lx-border);background:var(--lx-off-white);font-size:16px;font-weight:700;cursor:pointer;color:var(--lx-fg);";
+      btn.onclick = () => digitarTeclaVirtual(tecla);
+      divLinha.appendChild(btn);
+    });
+    cont.appendChild(divLinha);
+  });
+  if (modo !== "numero"){
+    const linhaEspaco = document.createElement("div");
+    linhaEspaco.style.cssText = "display:flex;gap:6px;justify-content:center;";
+    const btnEspaco = document.createElement("button");
+    btnEspaco.type = "button";
+    btnEspaco.textContent = "espaço";
+    btnEspaco.style.cssText = "flex:1;max-width:340px;padding:14px 0;border-radius:9px;border:1px solid var(--lx-border);background:var(--lx-off-white);font-size:13.5px;font-weight:700;cursor:pointer;color:var(--lx-fg);";
+    btnEspaco.onclick = () => digitarTeclaVirtual(" ");
+    linhaEspaco.appendChild(btnEspaco);
+    cont.appendChild(linhaEspaco);
+  }
+  document.getElementById("tecladoAlvoLabel").textContent = inputEl.placeholder || inputEl.id;
+  document.getElementById("tecladoVirtualScrim").style.display = "block";
+  marcarOverlayAberto();
+}
+
+function digitarTeclaVirtual(tecla){
+  if (!tecladoAlvoInput) return;
+  if (tecla === "⌫") tecladoAlvoInput.value = tecladoAlvoInput.value.slice(0, -1);
+  else if (tecla === "C") tecladoAlvoInput.value = "";
+  else tecladoAlvoInput.value += tecla;
+  tecladoAlvoInput.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function fecharTecladoVirtual(){
+  const scrim = document.getElementById("tecladoVirtualScrim");
+  if (scrim) scrim.style.display = "none";
+}
+
+function concluirTecladoVirtual(){
+  const alvo = tecladoAlvoInput;
+  fecharTecladoVirtual();
+  marcarOverlayFechado();
+  if (alvo && alvo.id === "scanInput" && alvo.value.trim() !== ""){
+    handleItemScan(alvo.value.trim());
+    alvo.value = "";
+  }
+}
+
+// Abre o teclado virtual só quando o usuário toca no campo de verdade
+// (não quando o próprio painel dá foco automático, como no modo pistola)
+document.getElementById("scanInput").addEventListener("click", function(){ abrirTecladoVirtual(this, "texto"); });
+document.getElementById("searchInput").addEventListener("click", function(){ abrirTecladoVirtual(this, "texto"); });
+document.getElementById("scanQtyInput").addEventListener("click", function(){ abrirTecladoVirtual(this, "numero"); });
+
 function aplicarEscopoUI(escopo){
   if (!escopo || escopo === "Global") return; // vê tudo, nada a esconder
 
@@ -1230,9 +1369,11 @@ function pararCamera(){
 function abrirGraficos(){
   renderGraficos();
   document.getElementById("modalGraficosScrim").classList.add("show");
+  marcarOverlayAberto();
 }
 function fecharGraficos(){
   document.getElementById("modalGraficosScrim").classList.remove("show");
+  marcarOverlayFechado();
 }
 
 let graficoAreaFiltro = "Todos";
