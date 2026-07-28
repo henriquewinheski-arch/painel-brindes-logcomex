@@ -1210,7 +1210,9 @@ document.getElementById("searchInput").addEventListener("focus", () => {
 document.addEventListener("click", (e) => {
   const caixa = document.getElementById("buscaSugestoes");
   const input = document.getElementById("searchInput");
-  if (caixa && !caixa.contains(e.target) && e.target !== input) caixa.style.display = "none";
+  const teclado = document.getElementById("tecladoVirtualScrim");
+  const cliqueNoTeclado = teclado && teclado.contains(e.target);
+  if (caixa && !caixa.contains(e.target) && e.target !== input && !cliqueNoTeclado) caixa.style.display = "none";
 });
 
 function renderSugestoesBusca(termo){
