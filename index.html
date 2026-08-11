@@ -591,19 +591,14 @@
           🎙️
         </button>
         <div id="vozInstrucao" style="font-size:13px;color:var(--lx-fg-muted);margin-top:14px;line-height:1.6;">
-          Toque no microfone e diga o item, área e quantidade.<br>
+          Toque no microfone e diga o item, a área e a quantidade.<br>
           <span style="font-size:11.5px;display:block;margin-top:6px;">
             <i>"cinco canetas pretas pra Marketing"</i><br>
-            <i>"reposição de dez moleskines CS"</i><br>
-            <i>"três camisetas roxas GG Comercial"</i><br>
-            <i>"duas sacolas pra Sales"</i>
-          </span>
-          <span style="font-size:11px;display:block;margin-top:8px;color:var(--chip-green-fg);font-weight:600;">
-            ⚡ Quando entender com certeza, registra automaticamente.
+            <i>"reposição de dez moleskines CS"</i>
           </span>
         </div>
         <div id="vozTranscricao" style="display:none;margin-top:16px;background:var(--lx-primary-darkest);
-             color:#fff;border-radius:12px;padding:14px 16px;font-size:14px;text-align:left;min-height:44px;line-height:1.5;">
+             color:#fff;border-radius:12px;padding:14px 16px;font-size:14px;text-align:left;min-height:44px;line-height:1.5;white-space:pre-line;">
         </div>
         <div id="vozProcessando" style="display:none;margin-top:12px;font-size:13px;color:var(--lx-fg-muted);">
           ⏳ Interpretando com IA...
@@ -612,21 +607,41 @@
 
       <!-- Card de confirmação voz -->
       <div id="vozConfirmacao" style="display:none;margin-top:16px;background:var(--lx-off-white);border-radius:14px;padding:18px;">
-        <div style="font-size:11px;color:var(--lx-fg-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:12px;">✅ Entendi assim — confirme</div>
+        <!-- Transcrição do áudio sempre visível -->
+        <div style="font-size:11px;color:var(--lx-fg-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:6px;">🎙️ O que foi dito</div>
+        <div id="vozConfTranscricao" style="font-size:13px;color:var(--lx-primary-darkest);font-style:italic;background:#fff;border-radius:8px;padding:10px 12px;border:1px solid var(--lx-border);margin-bottom:14px;"></div>
+
+        <div style="font-size:11px;color:var(--lx-fg-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;">✅ Entendi assim — confirme</div>
         <div id="vozConfItem" style="font-family:var(--lx-font-display);font-size:17px;color:var(--lx-primary-darkest);font-weight:600;"></div>
-        <div id="vozConfMeta" style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;"></div>
+        <div id="vozConfMeta" style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;white-space:pre-line;"></div>
+
+        <!-- Quantidade: −, input editável, + -->
         <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
-          <button onclick="changeScanQtyVoz(-1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">−</button>
-          <input id="vozQtyInput" type="number" inputmode="none" value="1" min="1"
-            style="width:64px;text-align:center;padding:9px;border-radius:8px;border:1px solid var(--lx-border);font-size:15px;">
-          <button onclick="changeScanQtyVoz(1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">+</button>
-          <span id="vozTipoBadge" style="margin-left:4px;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;"></span>
+          <button onclick="changeScanQtyVoz(-1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;
+                   font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">−</button>
+          <input id="vozQtyInput" type="number" inputmode="decimal" value="1" min="1"
+            onclick="this.select()"
+            style="flex:1;text-align:center;padding:10px;border-radius:8px;border:2px solid var(--lx-primary-pure);
+                   font-size:18px;font-weight:600;color:var(--lx-primary-darkest);max-width:100px;">
+          <button onclick="changeScanQtyVoz(1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;
+                   font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">+</button>
+          <span id="vozTipoBadge" style="padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;flex-shrink:0;"></span>
         </div>
+
+        <!-- Botões de ação -->
         <div style="display:flex;gap:10px;margin-top:14px;">
-          <button onclick="confirmarBaixaVoz()" style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-red-bg);color:var(--chip-red-fg);" id="btnConfVozSaida">Confirmar Retirada</button>
-          <button onclick="confirmarEntradaVoz()" style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-green-bg);color:var(--chip-green-fg);">Confirmar Reposição</button>
+          <button onclick="confirmarBaixaVoz()"
+            style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;
+                   background:var(--chip-red-bg);color:var(--chip-red-fg);">Confirmar Retirada</button>
+          <button onclick="confirmarEntradaVoz()"
+            style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;
+                   background:var(--chip-green-bg);color:var(--chip-green-fg);">Confirmar Reposição</button>
         </div>
-        <button onclick="cancelarVoz()" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">Tentar novamente</button>
+        <button onclick="cancelarVoz()"
+          style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);
+                 background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">🔄 Tentar novamente</button>
       </div>
     </div>
 
@@ -1707,20 +1722,17 @@ async function enviarAudioParaN8N(){
     }
 
     vozItemAtual = { ...parsed, id: parsed.itemId };
-    document.getElementById("vozTranscricao").textContent = "\"" + (parsed.textoTranscrito || parsed.nome) + "\"";
 
-    // Confiança alta → baixa automática
-    if (parsed.confianca === "alta"){
-      document.getElementById("vozTranscricao").textContent += "\n⚡ Registrando automaticamente...";
-      await executarBaixaVoz(parsed.tipo);
-      return;
-    }
+    // Sempre mostra a transcrição do que foi dito
+    const transcricao = parsed.textoTranscrito || parsed.nome || "";
+    document.getElementById("vozTranscricao").textContent = "\"" + transcricao + "\"";
 
-    // Confiança baixa → confirmação
+    // Sempre exibe o card de confirmação — nunca registra automaticamente
+    document.getElementById("vozConfTranscricao").textContent = transcricao ? "\"" + transcricao + "\"" : "(transcrição indisponível)";
     document.getElementById("vozConfItem").textContent = item[0] + " — " + item[1];
     document.getElementById("vozConfMeta").textContent =
-      "Área: " + item[2] + " · Saldo: " + item[3] + " · Mín: " + item[4] +
-      (parsed.motivo_baixa_confianca ? "\n⚠️ " + parsed.motivo_baixa_confianca : "");
+      "Área: " + item[2] + " · Saldo atual: " + item[3] + " · Mínimo: " + item[4] +
+      (parsed.confianca === "baixa" && parsed.motivo_baixa_confianca ? "\n⚠️ " + parsed.motivo_baixa_confianca : "");
     document.getElementById("vozQtyInput").value = parsed.quantidade || 1;
     const badge = document.getElementById("vozTipoBadge");
     const ehSaida = parsed.tipo === "Saída";
@@ -1779,6 +1791,7 @@ async function executarBaixaVoz(tipoOverride){
     vozItemAtual = null;
     document.getElementById("vozTranscricao").style.display = "none";
     document.getElementById("vozConfirmacao").style.display = "none";
+    document.getElementById("vozConfTranscricao").textContent = "";
     await carregarDadosReais();
 
   } catch(e){
@@ -1792,6 +1805,7 @@ function cancelarVoz(){
   document.getElementById("vozConfirmacao").style.display = "none";
   document.getElementById("vozTranscricao").style.display = "none";
   document.getElementById("vozTranscricao").textContent = "";
+  document.getElementById("vozConfTranscricao").textContent = "";
 }
 // ─── FIM VOZ ─────────────────────────────────────────────────────────────────
 
