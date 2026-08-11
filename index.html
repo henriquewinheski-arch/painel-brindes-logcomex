@@ -561,6 +561,7 @@
     <div class="controls" style="margin-bottom:14px;">
       <button class="area-tab active" data-scanmode="pistola" onclick="setScanModo('pistola')">Pistola / teclado</button>
       <button class="area-tab" data-scanmode="camera" onclick="setScanModo('camera')">Câmera</button>
+      <button class="area-tab" data-scanmode="voz" onclick="setScanModo('voz')">🎙️ Voz</button>
     </div>
 
     <div id="painelScanPistola">
@@ -576,6 +577,56 @@
       <div id="cameraStatus" style="font-size:12px;color:var(--lx-fg-muted);margin-bottom:8px;"></div>
       <video id="scanVideo" style="width:100%;max-width:360px;border-radius:12px;display:none;background:#000;" playsinline muted></video>
       <canvas id="scanCanvasHidden" style="display:none;"></canvas>
+    </div>
+
+    <!-- PAINEL VOZ -->
+    <div id="painelScanVoz" style="display:none;">
+      <div style="text-align:center;padding:20px 10px 10px;">
+        <button id="btnMicrofone" onclick="toggleGravacao()"
+          style="width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;
+                 background:var(--lx-primary-pure);color:#fff;font-size:32px;
+                 box-shadow:0 4px 20px rgba(102,19,208,.35);transition:all .2s;display:flex;
+                 align-items:center;justify-content:center;margin:0 auto;">
+          🎙️
+        </button>
+        <div id="vozInstrucao" style="font-size:13px;color:var(--lx-fg-muted);margin-top:14px;line-height:1.6;">
+          Toque no microfone e diga o item, área e quantidade.<br>
+          <span style="font-size:11.5px;display:block;margin-top:6px;">
+            <i>"cinco canetas pretas pra Marketing"</i><br>
+            <i>"reposição de dez moleskines CS"</i><br>
+            <i>"três camisetas roxas GG Comercial"</i><br>
+            <i>"duas sacolas pra Sales"</i>
+          </span>
+          <span style="font-size:11px;display:block;margin-top:8px;color:var(--chip-green-fg);font-weight:600;">
+            ⚡ Quando entender com certeza, registra automaticamente.
+          </span>
+        </div>
+        <div id="vozTranscricao" style="display:none;margin-top:16px;background:var(--lx-primary-darkest);
+             color:#fff;border-radius:12px;padding:14px 16px;font-size:14px;text-align:left;min-height:44px;line-height:1.5;">
+        </div>
+        <div id="vozProcessando" style="display:none;margin-top:12px;font-size:13px;color:var(--lx-fg-muted);">
+          ⏳ Interpretando com IA...
+        </div>
+      </div>
+
+      <!-- Card de confirmação voz -->
+      <div id="vozConfirmacao" style="display:none;margin-top:16px;background:var(--lx-off-white);border-radius:14px;padding:18px;">
+        <div style="font-size:11px;color:var(--lx-fg-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:12px;">✅ Entendi assim — confirme</div>
+        <div id="vozConfItem" style="font-family:var(--lx-font-display);font-size:17px;color:var(--lx-primary-darkest);font-weight:600;"></div>
+        <div id="vozConfMeta" style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+          <button onclick="changeScanQtyVoz(-1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">−</button>
+          <input id="vozQtyInput" type="number" inputmode="none" value="1" min="1"
+            style="width:64px;text-align:center;padding:9px;border-radius:8px;border:1px solid var(--lx-border);font-size:15px;">
+          <button onclick="changeScanQtyVoz(1)" style="width:38px;height:38px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:17px;cursor:pointer;color:var(--lx-primary-darkest);">+</button>
+          <span id="vozTipoBadge" style="margin-left:4px;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;"></span>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button onclick="confirmarBaixaVoz()" style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-red-bg);color:var(--chip-red-fg);" id="btnConfVozSaida">Confirmar Retirada</button>
+          <button onclick="confirmarEntradaVoz()" style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-green-bg);color:var(--chip-green-fg);">Confirmar Reposição</button>
+        </div>
+        <button onclick="cancelarVoz()" style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">Tentar novamente</button>
+      </div>
     </div>
 
     <div id="scanStatus" style="margin-top:14px;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:500;display:none;"></div>
@@ -1393,6 +1444,7 @@ let cameraStream = null;
 let cameraLoopId = null;
 let barcodeDetector = null;
 let cameraPausada = false;
+let vozGravando = false; // declarado aqui, lógica no bloco VOZ abaixo
 
 function showScanStatus(msg, kind){
   const el = document.getElementById("scanStatus");
@@ -1413,8 +1465,10 @@ function setScanModo(m){
   document.querySelector(`#scanCard [data-scanmode="${m}"]`).classList.add('active');
   document.getElementById("painelScanPistola").style.display = m === 'pistola' ? 'block' : 'none';
   document.getElementById("painelScanCamera").style.display = m === 'camera' ? 'block' : 'none';
+  document.getElementById("painelScanVoz").style.display = m === 'voz' ? 'block' : 'none';
   if (m === 'pistola') document.getElementById("scanInput").focus();
-  else pararCamera();
+  else if (m !== 'voz') pararCamera();
+  if (m !== 'voz' && vozGravando) pararGravacao();
 }
 
 function handleItemScan(code){
@@ -1556,6 +1610,264 @@ function pararCamera(){
   const video = document.getElementById("scanVideo");
   if (video) video.style.display = "none";
 }
+
+// ─── VOZ ────────────────────────────────────────────────────────────────────
+let vozRec = null;
+let vozItemAtual = null; // { id, nome, area, quantidade, tipo }
+
+function setScanModoVoz(){
+  // já chamado pelo setScanModo geral — só garante painel visível
+}
+
+function toggleGravacao(){
+  if (vozGravando) pararGravacao();
+  else iniciarGravacao();
+}
+
+function iniciarGravacao(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){
+    showScanStatus("Reconhecimento de voz não suportado neste navegador. Use Chrome.", "err");
+    return;
+  }
+  vozRec = new SR();
+  vozRec.lang = "pt-BR";
+  vozRec.interimResults = true;
+  vozRec.maxAlternatives = 1;
+
+  vozGravando = true;
+  atualizarBotaoMic(true);
+  document.getElementById("vozTranscricao").style.display = "block";
+  document.getElementById("vozTranscricao").textContent = "🔴 Ouvindo...";
+  document.getElementById("vozConfirmacao").style.display = "none";
+  document.getElementById("vozProcessando").style.display = "none";
+
+  vozRec.onresult = function(e){
+    let texto = "";
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      texto += e.results[i][0].transcript;
+    }
+    document.getElementById("vozTranscricao").textContent = "🔴 " + texto;
+  };
+
+  vozRec.onerror = function(e){
+    vozGravando = false;
+    atualizarBotaoMic(false);
+    showScanStatus("Erro no microfone: " + e.error, "err");
+  };
+
+  vozRec.onend = function(){
+    vozGravando = false;
+    atualizarBotaoMic(false);
+    const texto = document.getElementById("vozTranscricao").textContent.replace(/^🔴 /, "");
+    if (texto && texto !== "Ouvindo..."){
+      interpretarVozComIA(texto);
+    }
+  };
+
+  vozRec.start();
+}
+
+function pararGravacao(){
+  if (vozRec) vozRec.stop();
+  vozGravando = false;
+  atualizarBotaoMic(false);
+}
+
+function atualizarBotaoMic(gravando){
+  const btn = document.getElementById("btnMicrofone");
+  if (gravando){
+    btn.style.background = "var(--chip-red-fg)";
+    btn.style.transform = "scale(1.12)";
+    btn.textContent = "⏹";
+  } else {
+    btn.style.background = "var(--lx-primary-pure)";
+    btn.style.transform = "scale(1)";
+    btn.textContent = "🎙️";
+  }
+}
+
+async function interpretarVozComIA(texto){
+  document.getElementById("vozProcessando").style.display = "block";
+  document.getElementById("vozTranscricao").textContent = "\"" + texto + "\"";
+
+  const catalogoTexto = ITENS.map(i => `${i[0]}|${i[1]}|${i[2]}`).join("\n");
+
+  const prompt = `Você é o motor de interpretação de comandos de voz de um sistema de estoque de brindes corporativos da Logcomex.
+
+COMANDO DO USUÁRIO: "${texto}"
+
+CATÁLOGO COMPLETO (formato ID|Nome|Área):
+${catalogoTexto}
+
+== REGRAS DE INTERPRETAÇÃO ==
+
+ÁREAS — aceite qualquer variação e normalize:
+- "Marketing", "mkt", "markting", "márketing" → "Marketing"
+- "CS", "customer success", "sucesso do cliente", "suporte", "cx" → "CS"
+- "Comercial", "Sales", "vendas", "comerciais", "comercio", "comércio", "time de vendas", "área comercial" → "Comercial"
+- "Facilities", "facilities", "facilites", "infraestrutura", "predial" → "Facilities"
+- "RH", "recursos humanos", "rh", "people", "gente" → "RH"
+- Se a área não for mencionada, use a área do item no catálogo.
+
+ITENS — correspondência flexível, aceite variações:
+- Singular/plural: "caneta" = "canetas", "camiseta" = "camisetas", "camisa" = "camiseta"
+- Acentuação e typos: "moleskine", "molesquine", "moles kine" → Moleskine
+- Tamanhos de roupa: normalize "GG", "gg", "G-G", "extra grande" → GG; "XGG", "xgg", "extra extra grande" → XGG; "XXGG" → XXGG; "PP" → PP; "P" → P; "M" → M; "G" → G; "XG" → XG
+- Cores: "roxa/roxo" = Roxa, "branca/branco" = Branca, "preta/preto" = Preta, "laranja" = Laranja
+- "sacola de pano", "sacola tecido" → Sacola pano
+- "garrafa", "squeze", "squeeze" → Garrafa
+- "power bank", "carregador portátil" → Carregador power bank
+- "mouse pad", "mousepad", "tapete de mouse" → Mouse pad
+- "tapa câmera", "tampa câmera", "privacidade câmera" → Tapa câmera
+- "miniatura", "miniaturo" + contexto → identifique pelo tipo (avião, carreta, carro, empilhadeira)
+- "broche", "pin", "button" → Broche de time
+- "necessaire", "necessaire preta", "estojo" → Necessaire; se for "flexível" → Necessaire flexível
+- "display", "display frontal" → Display frontal
+- "caixa de presente", "caixinha" → Caixa presente
+- "agenda com caneta", "kit agenda caneta" → Agenda c/caneta
+- "kit agenda bússola", "kit bússola" → Kit agenda/bússola
+- "copo com tampa" → Copo c/tampa pequena
+- "boné" = "bone" = "cap"
+- "sacola roxa" sem tamanho → escolha a "Sacola roxa" (menor); "sacola roxa maior" → Sacola roxa maior; "sacola roxa grande" → Sacola roxa grande
+- "sacola preta" → Sacolas pretas (Marketing) ou Sacola preta média (Comercial) dependendo da área dita
+
+QUANTIDADE — extraia números por extenso ou algarismo:
+"um"=1, "uma"=1, "dois"=2, "duas"=2, "três"=3, "quatro"=4, "cinco"=5, "seis"=6, "sete"=7, "oito"=8, "nove"=9, "dez"=10, "quinze"=15, "vinte"=20, "trinta"=30, "quarenta"=40, "cinquenta"=50, "cem"=100
+Se quantidade não mencionada, use 1.
+
+TIPO (Saída ou Entrada):
+- Saída = retirada, saiu, saída, pegar, retira, retirou, baixa, deu saída, tirei, tirou, levei, levou, usar, uso, entregar, entregou
+- Entrada = reposição, entrada, repor, chegou, recebi, recebeu, adicionei, adicionou, devolveu, devolvido, estoque, voltou
+- Se não mencionado, assuma "Saída" (padrão é dar baixa).
+
+== REGRA DE CONFIANÇA ==
+- confianca: "alta" → você tem certeza do item correto E da quantidade E do tipo
+- confianca: "baixa" → qualquer ambiguidade (ex: camiseta sem tamanho, sacola sem especificação de qual, item com nome parecido com outro)
+
+== SAÍDA ==
+Retorne SOMENTE JSON válido, sem texto extra, sem markdown, sem backtick:
+{"itemId":"BRD-XXXX","nome":"nome exato do catálogo","area":"área normalizada","quantidade":N,"tipo":"Saída ou Entrada","confianca":"alta ou baixa","motivo_baixa_confianca":"explique se baixa"}
+
+Se for impossível identificar o item mesmo com esforço, retorne:
+{"erro":"explique brevemente o que faltou"}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 300,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content.find(b => b.type === "text")?.text || "";
+    const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+
+    document.getElementById("vozProcessando").style.display = "none";
+
+    if (parsed.erro){
+      showScanStatus("Não entendi: " + parsed.erro + ". Tente novamente com mais detalhes.", "warn");
+      return;
+    }
+
+    const item = ITENS.find(i => i[0] === parsed.itemId);
+    if (!item){
+      showScanStatus("Item \"" + parsed.nome + "\" não encontrado no catálogo. Tente novamente.", "warn");
+      return;
+    }
+
+    vozItemAtual = { ...parsed, id: parsed.itemId };
+
+    // ── CONFIANÇA ALTA → baixa automática sem confirmação ──────────────────
+    if (parsed.confianca === "alta"){
+      document.getElementById("vozTranscricao").textContent =
+        "\"" + texto + "\"\n⚡ Registrando automaticamente...";
+      await executarBaixaVoz(parsed.tipo);
+      return;
+    }
+
+    // ── CONFIANÇA BAIXA → mostra card de confirmação ──────────────────────
+    document.getElementById("vozConfItem").textContent = item[0] + " — " + item[1];
+    document.getElementById("vozConfMeta").textContent =
+      "Área: " + item[2] + " · Saldo: " + item[3] + " · Mín: " + item[4] +
+      (parsed.motivo_baixa_confianca ? "\n⚠️ " + parsed.motivo_baixa_confianca : "");
+    document.getElementById("vozQtyInput").value = parsed.quantidade || 1;
+
+    const badge = document.getElementById("vozTipoBadge");
+    const ehSaida = parsed.tipo === "Saída";
+    badge.textContent = ehSaida ? "Retirada" : "Reposição";
+    badge.style.background = ehSaida ? "var(--chip-red-bg)" : "var(--chip-green-bg)";
+    badge.style.color = ehSaida ? "var(--chip-red-fg)" : "var(--chip-green-fg)";
+    document.getElementById("vozConfirmacao").style.display = "block";
+
+  } catch(e){
+    document.getElementById("vozProcessando").style.display = "none";
+    console.error(e);
+    showScanStatus("Erro ao interpretar o áudio. Tente novamente.", "err");
+  }
+}
+
+function changeScanQtyVoz(delta){
+  const inp = document.getElementById("vozQtyInput");
+  let v = (parseInt(inp.value, 10) || 1) + delta;
+  if (v < 1) v = 1;
+  inp.value = v;
+}
+
+async function confirmarBaixaVoz(){ await executarBaixaVoz("Saída"); }
+async function confirmarEntradaVoz(){ await executarBaixaVoz("Entrada"); }
+
+async function executarBaixaVoz(tipoOverride){
+  if (!vozItemAtual) return;
+  const qtd = parseInt(document.getElementById("vozQtyInput").value, 10) || 1;
+  const tipo = tipoOverride || vozItemAtual.tipo;
+  const item = ITENS.find(i => i[0] === vozItemAtual.id);
+
+  showScanStatus("Registrando " + tipo.toLowerCase() + " de " + qtd + "x " + item[1] + "...", "ok");
+  document.getElementById("vozConfirmacao").style.display = "none";
+
+  try {
+    const res = await fetch(SCAN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken: currentIdToken,
+        itemId: vozItemAtual.id,
+        tipo: tipo,
+        quantidade: qtd
+      })
+    });
+    const resultado = await res.json();
+
+    if (!resultado.ok){
+      showScanStatus("Erro: " + (resultado.erro || "motivo desconhecido"), "err");
+      return;
+    }
+
+    showScanStatus(tipo + " de " + qtd + "x " + resultado.item + " registrada. Novo saldo: " + resultado.saldo + ".",
+      resultado.saldo <= resultado.minimo ? "warn" : "ok");
+
+    vozItemAtual = null;
+    document.getElementById("vozTranscricao").style.display = "none";
+    document.getElementById("vozConfirmacao").style.display = "none";
+    await carregarDadosReais();
+
+  } catch(e){
+    console.error(e);
+    showScanStatus("Não foi possível conectar ao servidor.", "err");
+  }
+}
+
+function cancelarVoz(){
+  vozItemAtual = null;
+  document.getElementById("vozConfirmacao").style.display = "none";
+  document.getElementById("vozTranscricao").style.display = "none";
+  document.getElementById("vozTranscricao").textContent = "";
+}
+// ─── FIM VOZ ─────────────────────────────────────────────────────────────────
 
 function abrirGraficos(){
   renderGraficos();
