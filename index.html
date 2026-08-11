@@ -194,6 +194,7 @@
   const DOMINIO_ESPERADO = "logcomex.com";
   const CONSULTA_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-consulta";
   const SCAN_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-scan";
+  const VOZ_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-voz";
   const TRANSFER_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-transferir";
   const OAUTH_EXCHANGE_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-oauth-exchange";
   const REDIRECT_URI = window.location.origin + window.location.pathname;
@@ -1613,65 +1614,45 @@ function pararCamera(){
 
 // ─── VOZ ────────────────────────────────────────────────────────────────────
 let vozRec = null;
-let vozItemAtual = null; // { id, nome, area, quantidade, tipo }
-
-function setScanModoVoz(){
-  // já chamado pelo setScanModo geral — só garante painel visível
-}
+let vozItemAtual = null;
+let vozChunks = [];
 
 function toggleGravacao(){
   if (vozGravando) pararGravacao();
   else iniciarGravacao();
 }
 
-function iniciarGravacao(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){
-    showScanStatus("Reconhecimento de voz não suportado neste navegador. Use Chrome.", "err");
+async function iniciarGravacao(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showScanStatus("Microfone não acessível neste navegador.", "err");
     return;
   }
-  vozRec = new SR();
-  vozRec.lang = "pt-BR";
-  vozRec.interimResults = true;
-  vozRec.maxAlternatives = 1;
-
-  vozGravando = true;
-  atualizarBotaoMic(true);
-  document.getElementById("vozTranscricao").style.display = "block";
-  document.getElementById("vozTranscricao").textContent = "🔴 Ouvindo...";
-  document.getElementById("vozConfirmacao").style.display = "none";
-  document.getElementById("vozProcessando").style.display = "none";
-
-  vozRec.onresult = function(e){
-    let texto = "";
-    for (let i = e.resultIndex; i < e.results.length; i++){
-      texto += e.results[i][0].transcript;
-    }
-    document.getElementById("vozTranscricao").textContent = "🔴 " + texto;
-  };
-
-  vozRec.onerror = function(e){
-    vozGravando = false;
-    atualizarBotaoMic(false);
-    showScanStatus("Erro no microfone: " + e.error, "err");
-  };
-
-  vozRec.onend = function(){
-    vozGravando = false;
-    atualizarBotaoMic(false);
-    const texto = document.getElementById("vozTranscricao").textContent.replace(/^🔴 /, "");
-    if (texto && texto !== "Ouvindo..."){
-      interpretarVozComIA(texto);
-    }
-  };
-
-  vozRec.start();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    vozChunks = [];
+    vozRec = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    vozRec.ondataavailable = e => { if (e.data.size > 0) vozChunks.push(e.data); };
+    vozRec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      enviarAudioParaN8N();
+    };
+    vozRec.start();
+    vozGravando = true;
+    atualizarBotaoMic(true);
+    document.getElementById("vozTranscricao").style.display = "block";
+    document.getElementById("vozTranscricao").textContent = "🔴 Ouvindo — toque novamente para parar...";
+    document.getElementById("vozConfirmacao").style.display = "none";
+    document.getElementById("vozProcessando").style.display = "none";
+  } catch(e) {
+    showScanStatus("Erro ao acessar microfone: " + e.message, "err");
+  }
 }
 
 function pararGravacao(){
-  if (vozRec) vozRec.stop();
+  if (vozRec && vozRec.state !== 'inactive') vozRec.stop();
   vozGravando = false;
   atualizarBotaoMic(false);
+  document.getElementById("vozTranscricao").textContent = "⏳ Enviando áudio...";
 }
 
 function atualizarBotaoMic(gravando){
@@ -1687,115 +1668,60 @@ function atualizarBotaoMic(gravando){
   }
 }
 
-async function interpretarVozComIA(texto){
+async function enviarAudioParaN8N(){
   document.getElementById("vozProcessando").style.display = "block";
-  document.getElementById("vozTranscricao").textContent = "\"" + texto + "\"";
+  const catalogoTexto = ITENS.map(i => i[0] + "|" + i[1] + "|" + i[2]).join("\n");
 
-  const catalogoTexto = ITENS.map(i => `${i[0]}|${i[1]}|${i[2]}`).join("\n");
-
-  const prompt = `Você é o motor de interpretação de comandos de voz de um sistema de estoque de brindes corporativos da Logcomex.
-
-COMANDO DO USUÁRIO: "${texto}"
-
-CATÁLOGO COMPLETO (formato ID|Nome|Área):
-${catalogoTexto}
-
-== REGRAS DE INTERPRETAÇÃO ==
-
-ÁREAS — aceite qualquer variação e normalize:
-- "Marketing", "mkt", "markting", "márketing" → "Marketing"
-- "CS", "customer success", "sucesso do cliente", "suporte", "cx" → "CS"
-- "Comercial", "Sales", "vendas", "comerciais", "comercio", "comércio", "time de vendas", "área comercial" → "Comercial"
-- "Facilities", "facilities", "facilites", "infraestrutura", "predial" → "Facilities"
-- "RH", "recursos humanos", "rh", "people", "gente" → "RH"
-- Se a área não for mencionada, use a área do item no catálogo.
-
-ITENS — correspondência flexível, aceite variações:
-- Singular/plural: "caneta" = "canetas", "camiseta" = "camisetas", "camisa" = "camiseta"
-- Acentuação e typos: "moleskine", "molesquine", "moles kine" → Moleskine
-- Tamanhos de roupa: normalize "GG", "gg", "G-G", "extra grande" → GG; "XGG", "xgg", "extra extra grande" → XGG; "XXGG" → XXGG; "PP" → PP; "P" → P; "M" → M; "G" → G; "XG" → XG
-- Cores: "roxa/roxo" = Roxa, "branca/branco" = Branca, "preta/preto" = Preta, "laranja" = Laranja
-- "sacola de pano", "sacola tecido" → Sacola pano
-- "garrafa", "squeze", "squeeze" → Garrafa
-- "power bank", "carregador portátil" → Carregador power bank
-- "mouse pad", "mousepad", "tapete de mouse" → Mouse pad
-- "tapa câmera", "tampa câmera", "privacidade câmera" → Tapa câmera
-- "miniatura", "miniaturo" + contexto → identifique pelo tipo (avião, carreta, carro, empilhadeira)
-- "broche", "pin", "button" → Broche de time
-- "necessaire", "necessaire preta", "estojo" → Necessaire; se for "flexível" → Necessaire flexível
-- "display", "display frontal" → Display frontal
-- "caixa de presente", "caixinha" → Caixa presente
-- "agenda com caneta", "kit agenda caneta" → Agenda c/caneta
-- "kit agenda bússola", "kit bússola" → Kit agenda/bússola
-- "copo com tampa" → Copo c/tampa pequena
-- "boné" = "bone" = "cap"
-- "sacola roxa" sem tamanho → escolha a "Sacola roxa" (menor); "sacola roxa maior" → Sacola roxa maior; "sacola roxa grande" → Sacola roxa grande
-- "sacola preta" → Sacolas pretas (Marketing) ou Sacola preta média (Comercial) dependendo da área dita
-
-QUANTIDADE — extraia números por extenso ou algarismo:
-"um"=1, "uma"=1, "dois"=2, "duas"=2, "três"=3, "quatro"=4, "cinco"=5, "seis"=6, "sete"=7, "oito"=8, "nove"=9, "dez"=10, "quinze"=15, "vinte"=20, "trinta"=30, "quarenta"=40, "cinquenta"=50, "cem"=100
-Se quantidade não mencionada, use 1.
-
-TIPO (Saída ou Entrada):
-- Saída = retirada, saiu, saída, pegar, retira, retirou, baixa, deu saída, tirei, tirou, levei, levou, usar, uso, entregar, entregou
-- Entrada = reposição, entrada, repor, chegou, recebi, recebeu, adicionei, adicionou, devolveu, devolvido, estoque, voltou
-- Se não mencionado, assuma "Saída" (padrão é dar baixa).
-
-== REGRA DE CONFIANÇA ==
-- confianca: "alta" → você tem certeza do item correto E da quantidade E do tipo
-- confianca: "baixa" → qualquer ambiguidade (ex: camiseta sem tamanho, sacola sem especificação de qual, item com nome parecido com outro)
-
-== SAÍDA ==
-Retorne SOMENTE JSON válido, sem texto extra, sem markdown, sem backtick:
-{"itemId":"BRD-XXXX","nome":"nome exato do catálogo","area":"área normalizada","quantidade":N,"tipo":"Saída ou Entrada","confianca":"alta ou baixa","motivo_baixa_confianca":"explique se baixa"}
-
-Se for impossível identificar o item mesmo com esforço, retorne:
-{"erro":"explique brevemente o que faltou"}`;
+  // Converte blob para base64
+  const blob = new Blob(vozChunks, { type: 'audio/webm' });
+  const base64 = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.readAsDataURL(blob);
+  });
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(VOZ_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }]
+        audioBase64: base64,
+        catalogoTexto: catalogoTexto,
+        idToken: currentIdToken
       })
     });
-    const data = await res.json();
-    const raw = data.content.find(b => b.type === "text")?.text || "";
-    const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-
+    const parsed = await res.json();
     document.getElementById("vozProcessando").style.display = "none";
 
     if (parsed.erro){
-      showScanStatus("Não entendi: " + parsed.erro + ". Tente novamente com mais detalhes.", "warn");
+      showScanStatus("Não entendi: " + parsed.erro + ". Tente novamente.", "warn");
+      document.getElementById("vozTranscricao").style.display = "none";
       return;
     }
 
     const item = ITENS.find(i => i[0] === parsed.itemId);
     if (!item){
-      showScanStatus("Item \"" + parsed.nome + "\" não encontrado no catálogo. Tente novamente.", "warn");
+      showScanStatus("Item não encontrado no catálogo. Tente novamente.", "warn");
+      document.getElementById("vozTranscricao").style.display = "none";
       return;
     }
 
     vozItemAtual = { ...parsed, id: parsed.itemId };
+    document.getElementById("vozTranscricao").textContent = "\"" + (parsed.textoTranscrito || parsed.nome) + "\"";
 
-    // ── CONFIANÇA ALTA → baixa automática sem confirmação ──────────────────
+    // Confiança alta → baixa automática
     if (parsed.confianca === "alta"){
-      document.getElementById("vozTranscricao").textContent =
-        "\"" + texto + "\"\n⚡ Registrando automaticamente...";
+      document.getElementById("vozTranscricao").textContent += "\n⚡ Registrando automaticamente...";
       await executarBaixaVoz(parsed.tipo);
       return;
     }
 
-    // ── CONFIANÇA BAIXA → mostra card de confirmação ──────────────────────
+    // Confiança baixa → confirmação
     document.getElementById("vozConfItem").textContent = item[0] + " — " + item[1];
     document.getElementById("vozConfMeta").textContent =
       "Área: " + item[2] + " · Saldo: " + item[3] + " · Mín: " + item[4] +
       (parsed.motivo_baixa_confianca ? "\n⚠️ " + parsed.motivo_baixa_confianca : "");
     document.getElementById("vozQtyInput").value = parsed.quantidade || 1;
-
     const badge = document.getElementById("vozTipoBadge");
     const ehSaida = parsed.tipo === "Saída";
     badge.textContent = ehSaida ? "Retirada" : "Reposição";
@@ -1806,7 +1732,7 @@ Se for impossível identificar o item mesmo com esforço, retorne:
   } catch(e){
     document.getElementById("vozProcessando").style.display = "none";
     console.error(e);
-    showScanStatus("Erro ao interpretar o áudio. Tente novamente.", "err");
+    showScanStatus("Erro ao processar áudio. Tente novamente.", "err");
   }
 }
 
@@ -1868,6 +1794,7 @@ function cancelarVoz(){
   document.getElementById("vozTranscricao").textContent = "";
 }
 // ─── FIM VOZ ─────────────────────────────────────────────────────────────────
+
 
 function abrirGraficos(){
   renderGraficos();
