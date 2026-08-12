@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --lx-primary-darkest:#2D085D;
@@ -984,7 +985,7 @@
     <h3 id="modalNome">—</h3>
     <div class="modal-sub" id="modalMeta">—</div>
     <div class="modal-codes">
-      <div class="modal-code-block"><img id="modalQr" alt="QR Code" style="width:160px;height:160px;border:1px solid var(--lx-border);border-radius:10px;padding:8px;background:#fff;"><div class="modal-code-label">QR Code</div></div>
+      <div class="modal-code-block"><div id="modalQr" style="width:160px;height:160px;display:flex;align-items:center;justify-content:center;border:1px solid var(--lx-border);border-radius:10px;padding:8px;background:#fff;"></div><div class="modal-code-label">QR Code</div></div>
       <div class="modal-code-block"><img id="modalBarcode" alt="Código de barras" style="max-width:220px;border:1px solid var(--lx-border);border-radius:10px;padding:8px;background:#fff;"><div class="modal-code-label">Código de barras</div></div>
     </div>
   </div>
@@ -1324,9 +1325,16 @@ function abrirModal(id, nome, area){
   document.getElementById("modalNome").textContent = nome;
   document.getElementById("modalMeta").textContent = id + " · " + area;
   document.getElementById("modalScrim").classList.add("show");
+
+  // Gera QR code com URL completa (para câmera nativa abrir o app direto)
+  const qrEl = document.getElementById("modalQr");
+  qrEl.innerHTML = "";
+  const appUrl = "https://henriquewinheski-arch.github.io/painel-brindes-logcomex/?item=" + encodeURIComponent(id);
+  new QRCode(qrEl, { text: appUrl, width: 144, height: 144, colorDark: "#000", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.M });
+
+  // Código de barras hardcodado (continua igual)
   const codigos = CODIGOS[id];
   if (codigos){
-    document.getElementById("modalQr").src = "data:image/png;base64," + codigos.qr;
     document.getElementById("modalBarcode").src = "data:image/png;base64," + codigos.bc;
   }
   marcarOverlayAberto();
