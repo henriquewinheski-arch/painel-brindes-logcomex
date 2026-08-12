@@ -564,6 +564,7 @@
       <button class="area-tab" data-scanmode="camera" onclick="setScanModo('camera')">Câmera</button>
       <button class="area-tab" data-scanmode="voz" onclick="setScanModo('voz')">🎙️ Voz</button>
       <button class="area-tab" data-scanmode="manual" onclick="setScanModo('manual')">✏️ Manual</button>
+      <button class="area-tab" data-scanmode="transferencia" onclick="setScanModo('transferencia')">🔄 Transferência</button>
     </div>
 
     <div id="painelScanPistola">
@@ -677,6 +678,70 @@
             style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-green-bg);color:var(--chip-green-fg);">Reposição</button>
         </div>
         <button onclick="cancelarManual()"
+          style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">← Voltar à busca</button>
+      </div>
+    </div>
+
+    <!-- PAINEL TRANSFERÊNCIA -->
+    <div id="painelScanTransferencia" style="display:none;">
+      <div style="font-size:13px;color:var(--lx-fg-muted);margin-bottom:12px;line-height:1.5;">
+        Mova itens entre áreas. Gera uma Saída na origem e uma Entrada no destino.
+      </div>
+
+      <!-- Busca do item -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;color:var(--lx-fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Item</label>
+        <input id="transfBusca" type="text" placeholder="Buscar por nome ou ID..."
+          oninput="filtrarTransf()"
+          style="width:100%;box-sizing:border-box;margin-top:4px;padding:11px 14px;border-radius:10px;border:1px solid var(--lx-border);font-size:14px;outline:none;">
+        <div id="transfLista" style="margin-top:6px;max-height:200px;overflow-y:auto;border-radius:10px;border:1px solid var(--lx-border);display:none;background:#fff;"></div>
+      </div>
+
+      <!-- Card confirmação transferência -->
+      <div id="transfConfirmacao" style="display:none;background:var(--lx-off-white);border-radius:14px;padding:18px;margin-top:4px;">
+        <div id="transfConfItem" style="font-family:var(--lx-font-display);font-size:16px;color:var(--lx-primary-darkest);font-weight:600;margin-bottom:12px;"></div>
+
+        <!-- Origem → Destino -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <div style="flex:1;">
+            <label style="font-size:11px;color:var(--lx-fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;">De (origem)</label>
+            <select id="transfOrigem" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--lx-border);font-size:14px;background:#fff;">
+              <option value="Marketing">Marketing</option>
+              <option value="CS">CS</option>
+              <option value="Comercial">Comercial</option>
+              <option value="Facilities">Facilities</option>
+              <option value="RH">RH</option>
+            </select>
+          </div>
+          <div style="font-size:20px;color:var(--lx-fg-muted);padding-top:18px;">→</div>
+          <div style="flex:1;">
+            <label style="font-size:11px;color:var(--lx-fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px;">Para (destino)</label>
+            <select id="transfDestino" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--lx-border);font-size:14px;background:#fff;">
+              <option value="CS">CS</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Comercial">Comercial</option>
+              <option value="Facilities">Facilities</option>
+              <option value="RH">RH</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Quantidade -->
+        <label style="font-size:11px;color:var(--lx-fg-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Quantidade</label>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;margin-bottom:14px;">
+          <button onclick="changeTransfQty(-1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">−</button>
+          <input id="transfQtyInput" type="number" inputmode="decimal" value="1" min="1"
+            onclick="this.select()"
+            style="flex:1;text-align:center;padding:10px;border-radius:8px;border:2px solid var(--lx-primary-pure);font-size:18px;font-weight:600;color:var(--lx-primary-darkest);max-width:100px;">
+          <button onclick="changeTransfQty(1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">+</button>
+        </div>
+
+        <button onclick="executarTransferencia()"
+          style="width:100%;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:15px;cursor:pointer;
+                 background:var(--lx-primary-pure);color:#fff;">Confirmar Transferência</button>
+        <button onclick="cancelarTransf()"
           style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">← Voltar à busca</button>
       </div>
     </div>
@@ -1519,10 +1584,12 @@ function setScanModo(m){
   document.getElementById("painelScanCamera").style.display = m === 'camera' ? 'block' : 'none';
   document.getElementById("painelScanVoz").style.display = m === 'voz' ? 'block' : 'none';
   document.getElementById("painelScanManual").style.display = m === 'manual' ? 'block' : 'none';
+  document.getElementById("painelScanTransferencia").style.display = m === 'transferencia' ? 'block' : 'none';
   if (m === 'pistola') document.getElementById("scanInput").focus();
   if (m !== 'camera') pararCamera();
   if (m !== 'voz' && vozGravando) pararGravacao();
   if (m === 'manual'){ document.getElementById("manualBusca").value = ""; filtrarManual(); document.getElementById("manualBusca").focus(); }
+  if (m === 'transferencia'){ document.getElementById("transfBusca").value = ""; filtrarTransf(); document.getElementById("transfConfirmacao").style.display = "none"; document.getElementById("transfBusca").focus(); }
 }
 
 function handleItemScan(code){
@@ -1667,32 +1734,33 @@ async function loopDetectarCamera(video){
 let jsqrLoopId = null;
 let lastJsQRScan = 0;
 function loopJsQR(video){
-  if (!cameraStream) return;
-  if (!cameraPausada && typeof jsQR === "function"){
+  jsqrLoopId = setInterval(() => {
+    if (!cameraStream){ clearInterval(jsqrLoopId); jsqrLoopId = null; return; }
+    if (cameraPausada) return;
+    if (typeof jsQR !== "function") return;
+    if (video.readyState < 2 || video.videoWidth === 0) return;
     const canvas = document.getElementById("scanCanvasHidden");
     const ctx = canvas.getContext("2d");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    if (canvas.width > 0){
+    try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
       if (code && code.data){
         const now = Date.now();
-        if (now - lastJsQRScan > 2000){
+        if (now - lastJsQRScan > 2500){
           lastJsQRScan = now;
           handleItemScan(code.data);
         }
       }
-    }
-  }
-  jsqrLoopId = requestAnimationFrame(() => loopJsQR(video));
+    } catch(e){ /* frame invalido */ }
+  }, 300);
 }
 
 function pararCamera(){
   if (cameraLoopId) cancelAnimationFrame(cameraLoopId);
-  if (jsqrLoopId) cancelAnimationFrame(jsqrLoopId);
-  jsqrLoopId = null;
+  if (jsqrLoopId){ clearInterval(jsqrLoopId); jsqrLoopId = null; }
   if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
   cameraStream = null;
   cameraPausada = false;
@@ -1975,6 +2043,132 @@ async function registrarManual(tipo){
   }
 }
 // ─── FIM MANUAL ───────────────────────────────────────────────────────────────
+
+// ─── TRANSFERÊNCIA ────────────────────────────────────────────────────────────
+let transfItemAtual = null;
+
+function filtrarTransf(){
+  const q = (document.getElementById("transfBusca").value || "").toLowerCase().trim();
+  const lista = document.getElementById("transfLista");
+  document.getElementById("transfConfirmacao").style.display = "none";
+  transfItemAtual = null;
+
+  if (!q){ lista.style.display = "none"; lista.innerHTML = ""; return; }
+
+  const resultados = ITENS.filter(i =>
+    i[1].toLowerCase().includes(q) || i[0].toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (resultados.length === 0){
+    lista.innerHTML = "<div style='padding:12px 14px;font-size:13px;color:var(--lx-fg-muted);'>Nenhum item encontrado.</div>";
+    lista.style.display = "block";
+    return;
+  }
+
+  lista.innerHTML = resultados.map(i =>
+    `<div onclick="selecionarTransf('${i[0]}')"
+      style="padding:12px 14px;border-bottom:1px solid var(--lx-border);cursor:pointer;font-size:14px;
+             display:flex;justify-content:space-between;align-items:center;"
+      onmouseover="this.style.background='var(--lx-off-white)'" onmouseout="this.style.background=''"
+    >
+      <span><b>${i[0]}</b> — ${i[1]}</span>
+      <span style="font-size:12px;color:var(--lx-fg-muted);margin-left:8px;white-space:nowrap;">${i[2]} · ${i[3]} un</span>
+    </div>`
+  ).join("");
+  lista.style.display = "block";
+}
+
+function selecionarTransf(id){
+  const item = ITENS.find(i => i[0] === id);
+  if (!item) return;
+  transfItemAtual = id;
+
+  document.getElementById("transfLista").style.display = "none";
+  document.getElementById("transfBusca").value = item[1];
+  document.getElementById("transfConfItem").textContent = item[0] + " — " + item[1] + " · Saldo atual: " + item[3];
+
+  // Pré-seleciona origem = área do item
+  const sel = document.getElementById("transfOrigem");
+  for (let i = 0; i < sel.options.length; i++){
+    if (sel.options[i].value === item[2]){ sel.selectedIndex = i; break; }
+  }
+  // Garante que destino seja diferente da origem
+  atualizarDestinoTransf();
+
+  document.getElementById("transfQtyInput").value = 1;
+  document.getElementById("transfConfirmacao").style.display = "block";
+}
+
+function atualizarDestinoTransf(){
+  const origem = document.getElementById("transfOrigem").value;
+  const sel = document.getElementById("transfDestino");
+  const areas = ["Marketing","CS","Comercial","Facilities","RH"];
+  // Se destino atual === origem, muda para primeira opção diferente
+  if (sel.value === origem){
+    const outra = areas.find(a => a !== origem);
+    for (let i = 0; i < sel.options.length; i++){
+      if (sel.options[i].value === outra){ sel.selectedIndex = i; break; }
+    }
+  }
+}
+
+function changeTransfQty(delta){
+  const inp = document.getElementById("transfQtyInput");
+  let v = (parseInt(inp.value, 10) || 1) + delta;
+  if (v < 1) v = 1;
+  inp.value = v;
+}
+
+function cancelarTransf(){
+  transfItemAtual = null;
+  document.getElementById("transfConfirmacao").style.display = "none";
+  document.getElementById("transfBusca").value = "";
+  document.getElementById("transfLista").style.display = "none";
+  document.getElementById("transfBusca").focus();
+}
+
+async function executarTransferencia(){
+  if (!transfItemAtual){ showScanStatus("Selecione um item.", "err"); return; }
+  const qtd = parseInt(document.getElementById("transfQtyInput").value, 10) || 1;
+  const origem = document.getElementById("transfOrigem").value;
+  const destino = document.getElementById("transfDestino").value;
+  if (origem === destino){ showScanStatus("Origem e destino não podem ser iguais.", "err"); return; }
+
+  const item = ITENS.find(i => i[0] === transfItemAtual);
+  showScanStatus("Registrando transferência de " + qtd + "x " + item[1] + " (" + origem + " → " + destino + ")...", "ok");
+  document.getElementById("transfConfirmacao").style.display = "none";
+
+  try {
+    // 1. Saída na origem
+    const r1 = await fetch(SCAN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: currentIdToken, itemId: transfItemAtual, tipo: "Saída", quantidade: qtd, areaOverride: origem })
+    });
+    const res1 = await r1.json();
+    if (!res1.ok){ showScanStatus("Erro na saída da origem: " + (res1.erro || "?"), "err"); document.getElementById("transfConfirmacao").style.display = "block"; return; }
+
+    // 2. Entrada no destino
+    const r2 = await fetch(SCAN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: currentIdToken, itemId: transfItemAtual, tipo: "Entrada", quantidade: qtd, areaOverride: destino })
+    });
+    const res2 = await r2.json();
+    if (!res2.ok){ showScanStatus("Saída registrada, mas erro na entrada no destino: " + (res2.erro || "?"), "err"); await carregarDadosReais(); return; }
+
+    showScanStatus("Transferência concluída: " + qtd + "x " + item[1] + " de " + origem + " para " + destino + ".", "ok");
+    transfItemAtual = null;
+    document.getElementById("transfBusca").value = "";
+    await carregarDadosReais();
+
+  } catch(e){
+    console.error(e);
+    showScanStatus("Erro de conexão durante a transferência.", "err");
+    document.getElementById("transfConfirmacao").style.display = "block";
+  }
+}
+// ─── FIM TRANSFERÊNCIA ────────────────────────────────────────────────────────
 
 
 function abrirGraficos(){
