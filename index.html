@@ -326,7 +326,10 @@
     document.getElementById("loginGate").classList.remove("show");
     document.getElementById("dashboardContent").style.display = "block";
     currentIdToken = idToken;
-    carregarDadosReais();
+    carregarDadosReais().then(() => {
+      const itemParam = new URLSearchParams(window.location.search).get("item");
+      if (itemParam){ setTimeout(() => handleItemScan(itemParam), 500); }
+    });
     if (opts.pularVideo) return; // sessão restaurada automaticamente — não repete o vídeo toda hora
     const v = document.getElementById("introVideoCard");
     if (v){
@@ -1608,10 +1611,14 @@ function setScanModo(m){
 function handleItemScan(code){
   code = code.trim();
   if (!code) return;
-  // Se o QR lido é a URL do próprio app, redireciona (câmera do celular apontando para QR do app)
+  // QR com URL do app: extrai o item se tiver ?item=BRD-XXXX
   const APP_URL = "https://henriquewinheski-arch.github.io/painel-brindes-logcomex/";
-  if (code === APP_URL || code.startsWith(APP_URL)){
-    if (window.location.href !== code) window.location.href = code;
+  if (code.startsWith(APP_URL)){
+    try {
+      const params = new URL(code).searchParams;
+      const itemId = params.get("item");
+      if (itemId) { handleItemScan(itemId); return; }
+    } catch(e){}
     return;
   }
   const item = ITENS.find(i => i[0] === code);
