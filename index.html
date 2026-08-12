@@ -564,7 +564,7 @@
       <button class="area-tab" data-scanmode="camera" onclick="setScanModo('camera')">Câmera</button>
       <button class="area-tab" data-scanmode="voz" onclick="setScanModo('voz')">🎙️ Voz</button>
       <button class="area-tab" data-scanmode="manual" onclick="setScanModo('manual')">✏️ Manual</button>
-      <button class="area-tab" data-scanmode="transferencia" onclick="setScanModo('transferencia')">🔄 Transferência</button>
+      <button class="area-tab" data-scanmode="transferencia" onclick="setScanModo('transferencia')">🔄 Transferência entre áreas</button>
     </div>
 
     <div id="painelScanPistola">
@@ -576,10 +576,23 @@
     </div>
 
     <div id="painelScanCamera" style="display:none">
-      <button class="area-tab" style="background:var(--lx-primary-pure);color:#fff;border-color:var(--lx-primary-pure);margin-bottom:12px;" onclick="ativarCamera()">Ativar câmera</button>
-      <div id="cameraStatus" style="font-size:12px;color:var(--lx-fg-muted);margin-bottom:8px;"></div>
-      <video id="scanVideo" style="width:100%;max-width:360px;border-radius:12px;display:none;background:#000;" playsinline autoplay muted></video>
-      <canvas id="scanCanvasHidden" style="display:none;"></canvas>
+      <!-- Botão principal: upload nativo (funciona em QUALQUER browser iOS/Android) -->
+      <div style="margin-bottom:12px;">
+        <button class="area-tab" style="background:var(--lx-primary-pure);color:#fff;border-color:var(--lx-primary-pure);width:100%;margin-bottom:8px;" onclick="document.getElementById('inputQRNativo').click()">
+          📷 Escanear QR Code
+        </button>
+        <input id="inputQRNativo" type="file" accept="image/*" capture="environment" style="display:none;" onchange="processarImagemQR(event)">
+        <div id="cameraStatus" style="font-size:12px;color:var(--lx-fg-muted);margin-bottom:8px;text-align:center;"></div>
+      </div>
+      <!-- Câmera ao vivo: funciona bem no Android Chrome / desktop -->
+      <details style="margin-top:4px;">
+        <summary style="font-size:12px;color:var(--lx-fg-muted);cursor:pointer;user-select:none;">Câmera ao vivo (Android/desktop)</summary>
+        <div style="margin-top:10px;">
+          <button class="area-tab" style="background:var(--lx-primary-pure);color:#fff;border-color:var(--lx-primary-pure);margin-bottom:12px;" onclick="ativarCamera()">Ativar câmera ao vivo</button>
+          <video id="scanVideo" style="width:100%;max-width:360px;border-radius:12px;display:none;background:#000;" playsinline autoplay muted></video>
+          <canvas id="scanCanvasHidden" style="display:none;"></canvas>
+        </div>
+      </details>
     </div>
 
     <!-- PAINEL VOZ -->
@@ -1595,6 +1608,12 @@ function setScanModo(m){
 function handleItemScan(code){
   code = code.trim();
   if (!code) return;
+  // Se o QR lido é a URL do próprio app, redireciona (câmera do celular apontando para QR do app)
+  const APP_URL = "https://henriquewinheski-arch.github.io/painel-brindes-logcomex/";
+  if (code === APP_URL || code.startsWith(APP_URL)){
+    if (window.location.href !== code) window.location.href = code;
+    return;
+  }
   const item = ITENS.find(i => i[0] === code);
   if (item){
     scanCurrentId = code;
@@ -1769,6 +1788,44 @@ function pararCamera(){
   const video = document.getElementById("scanVideo");
   if (video) video.style.display = "none";
 }
+
+// ─── CÂMERA NATIVA (iOS-safe) ──────────────────────────────────────────────
+async function processarImagemQR(event){
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = ""; // permite reler o mesmo QR
+  const statusEl = document.getElementById("cameraStatus");
+  statusEl.textContent = "⏳ Lendo QR Code...";
+  if (typeof jsQR !== "function"){
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const canvas = document.getElementById("scanCanvasHidden");
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+    if (code && code.data){
+      statusEl.textContent = "";
+      handleItemScan(code.data);
+    } else {
+      statusEl.textContent = "❌ QR Code não reconhecido. Tente com mais luz ou mais perto.";
+    }
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); statusEl.textContent = "❌ Erro ao carregar imagem."; };
+  img.src = url;
+}
+// ─── FIM CÂMERA NATIVA ────────────────────────────────────────────────────
 
 // ─── VOZ ────────────────────────────────────────────────────────────────────
 let vozRec = null;
