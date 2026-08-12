@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Codes — Brindes Logcomex</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
+  h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .no-print { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { background: #6613D4; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-outline { background: #fff; color: #6613D4; border: 1px solid #6613D4; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .filter-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-btn { background: #fff; border: 1px solid #ddd; border-radius: 99px; padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; color: #444; }
+  .filter-btn.active { background: #2D085D; color: #fff; border-color: #2D085D; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px 10px 12px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.08); page-break-inside: avoid; break-inside: avoid; }
+  .area-badge { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; border-radius: 99px; padding: 2px 10px; margin-bottom: 8px; letter-spacing: .04em; text-transform: uppercase; }
+  .qr-wrap { display: flex; justify-content: center; margin: 0 auto; }
+  .qr-wrap canvas, .qr-wrap img { width: 120px !important; height: 120px !important; }
+  .id { font-size: 11px; color: #888; margin-top: 6px; font-family: monospace; }
+  .nome { font-size: 12px; color: #1a1a2e; font-weight: 600; margin-top: 3px; line-height: 1.3; }
+  #loginGate { display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  #loginGate.show { display: flex; }
+  #mainContent { display: none; }
+  #mainContent.show { display: block; }
+  #status { font-size: 13px; color: #666; padding: 10px 0; }
+  #lgErr { color: #c70404; font-size: 13px; background: #fdcdcd; padding: 10px 16px; border-radius: 8px; display: none; }
+  #lgErr.show { display: block; }
+  @media print {
+    body { background: #fff; padding: 10px; }
+    .no-print { display: none; }
+    .grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginGate">
+  <div style="text-align:center;">
+    <div style="font-size:28px;margin-bottom:8px;">🏷️</div>
+    <h1 style="font-size:20px;color:#2D085D;">QR Codes — Brindes Logcomex</h1>
+    <p style="font-size:13px;color:#666;margin:8px 0 20px;">Faça login com sua conta @logcomex.com</p>
+    <button class="btn" onclick="iniciarLoginGoogle()">Entrar com Google</button>
+    <div id="lgErr" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<div id="mainContent">
+  <h1>🏷️ QR Codes — Brindes Logcomex</h1>
+  <p class="sub" id="subTitle">Carregando itens...</p>
+  <div class="no-print">
+    <button class="btn" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+    <button class="btn-outline" onclick="fazerLogout()">Sair</button>
+    <div class="filter-group" id="filtroArea">
+      <button class="filter-btn active" data-area="Todos" onclick="filtrar('Todos')">Todos</button>
+      <button class="filter-btn" data-area="Marketing" onclick="filtrar('Marketing')">Marketing</button>
+      <button class="filter-btn" data-area="CS" onclick="filtrar('CS')">CS</button>
+      <button class="filter-btn" data-area="Comercial" onclick="filtrar('Comercial')">Comercial</button>
+    </div>
+  </div>
+  <div id="status"></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const CLIENT_ID = "161510977968-oofrl3c78ijlt6t146lm35sdltdr4tdv.apps.googleusercontent.com";
+const DOMINIO_ESPERADO = "logcomex.com";
+const CONSULTA_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-consulta";
+const OAUTH_EXCHANGE_URL = "https://ramonlogcomex.app.n8n.cloud/webhook/brindes-oauth-exchange";
+const APP_URL = "https://henriquewinheski-arch.github.io/painel-brindes-logcomex/";
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+const AREA_COLORS = { "Marketing": "#6613D4", "CS": "#1FAC66", "Comercial": "#CB6700", "Facilities": "#0B0D19", "RH": "#C70404" };
+
+let currentIdToken = null;
+let todosItens = [];
+let filtroAtual = "Todos";
+
+function decodeJwt(token){
+  const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(decodeURIComponent(atob(base64).split("").map(c =>
+    "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")));
+}
+
+function iniciarLoginGoogle(){
+  const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  sessionStorage.setItem("oauth_state_qr", state);
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID, redirect_uri: REDIRECT_URI, response_type: "code",
+    scope: "openid email profile", state: state, hd: DOMINIO_ESPERADO, prompt: "select_account"
+  });
+  window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+}
+
+function fazerLogout(){
+  localStorage.removeItem("brindes_id_token");
+  localStorage.removeItem("brindes_id_token_exp");
+  window.location.reload();
+}
+
+function mostrarErro(msg){
+  document.getElementById("loginGate").classList.add("show");
+  document.getElementById("mainContent").classList.remove("show");
+  const e = document.getElementById("lgErr");
+  e.textContent = msg; e.classList.add("show");
+}
+
+async function processarCallback(){
+  const p = new URLSearchParams(window.location.search);
+  const code = p.get("code");
+  const state = p.get("state");
+  const erro = p.get("error");
+  if (!code && !erro) return false;
+  history.replaceState(null, "", window.location.pathname);
+  if (erro){ document.getElementById("loginGate").classList.add("show"); return true; }
+  const stateEsperado = sessionStorage.getItem("oauth_state_qr");
+  sessionStorage.removeItem("oauth_state_qr");
+  if (state !== stateEsperado){ mostrarErro("Falha de segurança no login. Tente novamente."); return true; }
+  try {
+    const res = await fetch(OAUTH_EXCHANGE_URL, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, redirectUri: REDIRECT_URI })
+    });
+    const r = await res.json();
+    if (!r.ok){ mostrarErro("Erro ao concluir login: " + (r.erro || "desconhecido")); return true; }
+    const payload = decodeJwt(r.id_token);
+    if (payload.hd !== DOMINIO_ESPERADO){ mostrarErro("Apenas contas @" + DOMINIO_ESPERADO + " permitidas."); return true; }
+    localStorage.setItem("brindes_id_token", r.id_token);
+    localStorage.setItem("brindes_id_token_exp", String(payload.exp || 0));
+    entrar(r.id_token);
+  } catch(e){ mostrarErro("Erro de conexão ao fazer login."); }
+  return true;
+}
+
+function entrar(token){
+  currentIdToken = token;
+  document.getElementById("loginGate").classList.remove("show");
+  document.getElementById("mainContent").classList.add("show");
+  carregarItens();
+}
+
+async function carregarItens(){
+  document.getElementById("status").textContent = "⏳ Carregando itens do servidor...";
+  try {
+    const res = await fetch(CONSULTA_URL + "?idToken=" + encodeURIComponent(currentIdToken));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    todosItens = data.itens || [];
+    document.getElementById("subTitle").textContent =
+      "Aponte a câmera do celular para abrir o app com o item selecionado. " + todosItens.length + " itens.";
+    document.getElementById("status").textContent = "";
+    filtrar(filtroAtual);
+  } catch(e){
+    document.getElementById("status").textContent = "❌ Erro ao carregar itens: " + e.message;
+  }
+}
+
+function filtrar(area){
+  filtroAtual = area;
+  document.querySelectorAll(".filter-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.area === area));
+  const itens = area === "Todos" ? todosItens : todosItens.filter(i => i.area === area);
+  renderGrid(itens);
+}
+
+function renderGrid(itens){
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  itens.forEach(item => {
+    const url = APP_URL + "?item=" + encodeURIComponent(item.item_id);
+    const cor = AREA_COLORS[item.area] || "#2D085D";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="area-badge" style="background:${cor}">${item.area}</div>
+      <div class="qr-wrap" id="qr-${item.item_id}"></div>
+      <div class="id">${item.item_id}</div>
+      <div class="nome">${item.nome}</div>`;
+    grid.appendChild(card);
+    // Gera QR code com URL completa
+    new QRCode(document.getElementById("qr-" + item.item_id), {
+      text: url,
+      width: 120,
+      height: 120,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+}
+
+// Inicialização
+window.addEventListener("load", async function(){
+  const veioDoLogin = await processarCallback();
+  if (veioDoLogin) return;
+  const token = localStorage.getItem("brindes_id_token");
+  const exp = parseInt(localStorage.getItem("brindes_id_token_exp") || "0", 10);
+  const agora = Math.floor(Date.now() / 1000);
+  if (token && exp > agora + 60){
+    try { decodeJwt(token); entrar(token); return; } catch(e){}
+  }
+  document.getElementById("loginGate").classList.add("show");
+});
+</script>
+</body>
+</html>
