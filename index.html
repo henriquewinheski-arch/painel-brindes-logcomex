@@ -284,29 +284,12 @@
   }
 
   function salvarSessao(idToken, payload){
-    localStorage.setItem("brindes_id_token", idToken);
-    localStorage.setItem("brindes_id_token_exp", String(payload.exp || 0));
+    // Sessão não é salva — sempre pede login
   }
 
   function limparSessaoSalva(){
     localStorage.removeItem("brindes_id_token");
     localStorage.removeItem("brindes_id_token_exp");
-  }
-
-  function tentarLoginSilencioso(){
-    const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessionStorage.setItem("oauth_state", state);
-    sessionStorage.setItem("oauth_silencioso", "1");
-    const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: "code",
-      scope: "openid email profile",
-      state: state,
-      hd: DOMINIO_ESPERADO,
-      prompt: "none"
-    });
-    window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
   }
 
   function mostrarProcessandoLogin(){
@@ -331,7 +314,6 @@
       const itemParam = new URLSearchParams(window.location.search).get("item");
       if (itemParam){ setTimeout(() => handleItemScan(itemParam), 500); }
     });
-    if (opts.pularVideo) return; // sessão restaurada automaticamente — não repete o vídeo toda hora
     const v = document.getElementById("introVideoCard");
     if (v){
       v.muted = false;
@@ -346,29 +328,9 @@
   }
 
   window.addEventListener("load", async function(){
+    limparSessaoSalva();
     const veioDoLogin = await processarLoginCallback();
     if (veioDoLogin) return;
-
-    // Sessão salva no aparelho ainda válida? Entra direto, sem tela de login nem vídeo de novo.
-    const tokenSalvo = localStorage.getItem("brindes_id_token");
-    const expSalvo = parseInt(localStorage.getItem("brindes_id_token_exp") || "0", 10);
-    const agora = Math.floor(Date.now() / 1000);
-    if (tokenSalvo && expSalvo > agora + 60) {
-      try {
-        const payload = decodeJwt(tokenSalvo);
-        concluirLogin(tokenSalvo, payload, { pularVideo: true });
-        return;
-      } catch (e) { limparSessaoSalva(); }
-    }
-
-    // Sem sessão válida salva: tenta renovar sozinho em segundo plano (1x por aba),
-    // aproveitando se o navegador do aparelho já estiver com uma conta Google ativa.
-    if (!sessionStorage.getItem("silent_tentado")) {
-      sessionStorage.setItem("silent_tentado", "1");
-      tentarLoginSilencioso();
-      return;
-    }
-
     document.getElementById("loginGate").classList.add("show");
   });
 
