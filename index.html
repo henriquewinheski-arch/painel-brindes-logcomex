@@ -578,7 +578,7 @@
     <div id="painelScanCamera" style="display:none">
       <button class="area-tab" style="background:var(--lx-primary-pure);color:#fff;border-color:var(--lx-primary-pure);margin-bottom:12px;" onclick="ativarCamera()">Ativar câmera</button>
       <div id="cameraStatus" style="font-size:12px;color:var(--lx-fg-muted);margin-bottom:8px;"></div>
-      <video id="scanVideo" style="width:100%;max-width:360px;border-radius:12px;display:none;background:#000;" playsinline muted></video>
+      <video id="scanVideo" style="width:100%;max-width:360px;border-radius:12px;display:none;background:#000;" playsinline autoplay muted></video>
       <canvas id="scanCanvasHidden" style="display:none;"></canvas>
     </div>
 
@@ -1738,7 +1738,8 @@ function loopJsQR(video){
     if (!cameraStream){ clearInterval(jsqrLoopId); jsqrLoopId = null; return; }
     if (cameraPausada) return;
     if (typeof jsQR !== "function") return;
-    if (video.readyState < 2 || video.videoWidth === 0) return;
+    // iOS: aguarda readyState 4 (HAVE_ENOUGH_DATA) e dimensões válidas
+    if (video.readyState < 4 || video.videoWidth === 0 || video.videoHeight === 0) return;
     const canvas = document.getElementById("scanCanvasHidden");
     const ctx = canvas.getContext("2d");
     canvas.width = video.videoWidth;
@@ -1746,7 +1747,8 @@ function loopJsQR(video){
     try {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+      // Tenta com e sem inversão para máxima compatibilidade
+      let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
       if (code && code.data){
         const now = Date.now();
         if (now - lastJsQRScan > 2500){
@@ -1755,7 +1757,7 @@ function loopJsQR(video){
         }
       }
     } catch(e){ /* frame invalido */ }
-  }, 300);
+  }, 500); // 500ms — mais estável no iOS Safari
 }
 
 function pararCamera(){
