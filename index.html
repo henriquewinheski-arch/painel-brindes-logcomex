@@ -1793,33 +1793,59 @@ function pararCamera(){
 async function processarImagemQR(event){
   const file = event.target.files[0];
   if (!file) return;
-  event.target.value = ""; // permite reler o mesmo QR
+  event.target.value = "";
   const statusEl = document.getElementById("cameraStatus");
   statusEl.textContent = "⏳ Lendo QR Code...";
-  if (typeof jsQR !== "function"){
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
+
   const img = new Image();
   const url = URL.createObjectURL(file);
-  img.onload = () => {
+  img.onload = async () => {
     URL.revokeObjectURL(url);
-    const canvas = document.getElementById("scanCanvasHidden");
+
+    // Tenta BarcodeDetector nativo primeiro (Android Chrome — mais rápido e preciso)
+    if ("BarcodeDetector" in window){
+      try {
+        const det = new BarcodeDetector({ formats: ["qr_code", "code_128", "code_39"] });
+        const bitmap = await createImageBitmap(file);
+        const codes = await det.detect(bitmap);
+        bitmap.close();
+        if (codes.length > 0){
+          statusEl.textContent = "";
+          handleItemScan(codes[0].rawValue);
+          return;
+        }
+      } catch(e){ /* continua para jsQR */ }
+    }
+
+    // jsQR: redimensiona para 1024px max (resolve problema com fotos de alta resolução)
+    if (typeof jsQR !== "function"){
+      await new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    const MAX = 1024;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (w > MAX || h > MAX){
+      if (w > h){ h = Math.round(h * MAX / w); w = MAX; }
+      else { w = Math.round(w * MAX / h); h = MAX; }
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext("2d");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
     const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+
     if (code && code.data){
       statusEl.textContent = "";
       handleItemScan(code.data);
     } else {
-      statusEl.textContent = "❌ QR Code não reconhecido. Tente com mais luz ou mais perto.";
+      statusEl.textContent = "❌ Não reconhecido. Tente mais perto e com boa iluminação.";
     }
   };
   img.onerror = () => { URL.revokeObjectURL(url); statusEl.textContent = "❌ Erro ao carregar imagem."; };
