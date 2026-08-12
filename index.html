@@ -563,6 +563,7 @@
       <button class="area-tab active" data-scanmode="pistola" onclick="setScanModo('pistola')">Pistola / teclado</button>
       <button class="area-tab" data-scanmode="camera" onclick="setScanModo('camera')">Câmera</button>
       <button class="area-tab" data-scanmode="voz" onclick="setScanModo('voz')">🎙️ Voz</button>
+      <button class="area-tab" data-scanmode="manual" onclick="setScanModo('manual')">✏️ Manual</button>
     </div>
 
     <div id="painelScanPistola">
@@ -642,6 +643,41 @@
         <button onclick="cancelarVoz()"
           style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);
                  background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">🔄 Tentar novamente</button>
+      </div>
+    </div>
+
+    <!-- PAINEL MANUAL -->
+    <div id="painelScanManual" style="display:none;">
+      <div style="margin-bottom:10px;">
+        <input id="manualBusca" type="text" inputmode="text" placeholder="Buscar item por nome ou ID..."
+          oninput="filtrarManual()"
+          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:1px solid var(--lx-border);font-size:14px;outline:none;">
+        <div id="manualLista" style="margin-top:8px;max-height:220px;overflow-y:auto;border-radius:10px;border:1px solid var(--lx-border);display:none;background:#fff;"></div>
+      </div>
+
+      <!-- Card de confirmação manual -->
+      <div id="manualConfirmacao" style="display:none;background:var(--lx-off-white);border-radius:14px;padding:18px;margin-top:4px;">
+        <div style="font-size:11px;color:var(--lx-fg-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;">Item selecionado</div>
+        <div id="manualConfItem" style="font-family:var(--lx-font-display);font-size:17px;color:var(--lx-primary-darkest);font-weight:600;"></div>
+        <div id="manualConfMeta" style="font-size:13px;color:var(--lx-fg-muted);margin-top:4px;"></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;">
+          <button onclick="changeManualQty(-1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">−</button>
+          <input id="manualQtyInput" type="number" inputmode="decimal" value="1" min="1"
+            onclick="this.select()"
+            style="flex:1;text-align:center;padding:10px;border-radius:8px;border:2px solid var(--lx-primary-pure);
+                   font-size:18px;font-weight:600;color:var(--lx-primary-darkest);max-width:100px;">
+          <button onclick="changeManualQty(1)"
+            style="width:42px;height:42px;border-radius:8px;border:1px solid var(--lx-border);background:#fff;font-size:20px;cursor:pointer;color:var(--lx-primary-darkest);flex-shrink:0;">+</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button onclick="registrarManual('Saída')"
+            style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-red-bg);color:var(--chip-red-fg);">Retirada</button>
+          <button onclick="registrarManual('Entrada')"
+            style="flex:1;padding:13px;border-radius:12px;border:none;font-weight:600;font-size:14px;cursor:pointer;background:var(--chip-green-bg);color:var(--chip-green-fg);">Reposição</button>
+        </div>
+        <button onclick="cancelarManual()"
+          style="margin-top:10px;width:100%;padding:10px;border-radius:12px;border:1px solid var(--lx-border);background:#fff;color:var(--lx-fg-muted);font-size:13px;cursor:pointer;">← Voltar à busca</button>
       </div>
     </div>
 
@@ -1482,9 +1518,11 @@ function setScanModo(m){
   document.getElementById("painelScanPistola").style.display = m === 'pistola' ? 'block' : 'none';
   document.getElementById("painelScanCamera").style.display = m === 'camera' ? 'block' : 'none';
   document.getElementById("painelScanVoz").style.display = m === 'voz' ? 'block' : 'none';
+  document.getElementById("painelScanManual").style.display = m === 'manual' ? 'block' : 'none';
   if (m === 'pistola') document.getElementById("scanInput").focus();
-  else if (m !== 'voz') pararCamera();
+  if (m !== 'camera') pararCamera();
   if (m !== 'voz' && vozGravando) pararGravacao();
+  if (m === 'manual'){ document.getElementById("manualBusca").value = ""; filtrarManual(); document.getElementById("manualBusca").focus(); }
 }
 
 function handleItemScan(code){
@@ -1582,19 +1620,27 @@ async function registrarScan(tipo){
 
 async function ativarCamera(){
   const statusEl = document.getElementById("cameraStatus");
-  if (!("BarcodeDetector" in window)){
-    statusEl.textContent = "Seu navegador não tem leitura nativa de código (BarcodeDetector). Funciona no Chrome/Android. No computador, use a aba Pistola.";
-    return;
-  }
-  try{
-    barcodeDetector = new BarcodeDetector({ formats: ["qr_code", "code_128"] });
+  statusEl.textContent = "Acessando câmera...";
+  try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     const video = document.getElementById("scanVideo");
     video.srcObject = cameraStream;
     video.style.display = "block";
     await video.play();
-    statusEl.textContent = "Câmera ativa — aponte para o QR ou código de barras.";
-    loopDetectarCamera(video);
+
+    if ("BarcodeDetector" in window){
+      // API nativa disponível
+      barcodeDetector = new BarcodeDetector({ formats: ["qr_code", "code_128"] });
+      statusEl.textContent = "Câmera ativa — aponte para o QR ou código de barras.";
+      loopDetectarCamera(video);
+    } else {
+      // Fallback: jsQR via canvas
+      statusEl.textContent = "Câmera ativa (modo compatível) — aponte para o QR Code.";
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js";
+      script.onload = () => loopJsQR(video);
+      document.head.appendChild(script);
+    }
   } catch(err){
     statusEl.textContent = "Não foi possível acessar a câmera: " + err.message;
   }
@@ -1618,8 +1664,35 @@ async function loopDetectarCamera(video){
   cameraLoopId = requestAnimationFrame(() => loopDetectarCamera(video));
 }
 
+let jsqrLoopId = null;
+let lastJsQRScan = 0;
+function loopJsQR(video){
+  if (!cameraStream) return;
+  if (!cameraPausada && typeof jsQR === "function"){
+    const canvas = document.getElementById("scanCanvasHidden");
+    const ctx = canvas.getContext("2d");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    if (canvas.width > 0){
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code && code.data){
+        const now = Date.now();
+        if (now - lastJsQRScan > 2000){
+          lastJsQRScan = now;
+          handleItemScan(code.data);
+        }
+      }
+    }
+  }
+  jsqrLoopId = requestAnimationFrame(() => loopJsQR(video));
+}
+
 function pararCamera(){
   if (cameraLoopId) cancelAnimationFrame(cameraLoopId);
+  if (jsqrLoopId) cancelAnimationFrame(jsqrLoopId);
+  jsqrLoopId = null;
   if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
   cameraStream = null;
   cameraPausada = false;
@@ -1808,6 +1881,100 @@ function cancelarVoz(){
   document.getElementById("vozConfTranscricao").textContent = "";
 }
 // ─── FIM VOZ ─────────────────────────────────────────────────────────────────
+
+// ─── MANUAL ──────────────────────────────────────────────────────────────────
+let manualItemAtual = null;
+
+function filtrarManual(){
+  const q = (document.getElementById("manualBusca").value || "").toLowerCase().trim();
+  const lista = document.getElementById("manualLista");
+  const conf = document.getElementById("manualConfirmacao");
+  conf.style.display = "none";
+  manualItemAtual = null;
+
+  if (!q){ lista.style.display = "none"; lista.innerHTML = ""; return; }
+
+  const resultados = ITENS.filter(i =>
+    i[1].toLowerCase().includes(q) || i[0].toLowerCase().includes(q)
+  ).slice(0, 20);
+
+  if (resultados.length === 0){
+    lista.innerHTML = "<div style='padding:12px 14px;font-size:13px;color:var(--lx-fg-muted);'>Nenhum item encontrado.</div>";
+    lista.style.display = "block";
+    return;
+  }
+
+  lista.innerHTML = resultados.map(i =>
+    `<div onclick="selecionarManual('${i[0]}')"
+      style="padding:12px 14px;border-bottom:1px solid var(--lx-border);cursor:pointer;font-size:14px;
+             display:flex;justify-content:space-between;align-items:center;"
+      onmouseover="this.style.background='var(--lx-off-white)'" onmouseout="this.style.background=''"
+    >
+      <span><b>${i[0]}</b> — ${i[1]}</span>
+      <span style="font-size:12px;color:var(--lx-fg-muted);margin-left:8px;white-space:nowrap;">${i[2]} · ${i[3]} un</span>
+    </div>`
+  ).join("");
+  lista.style.display = "block";
+}
+
+function selecionarManual(id){
+  const item = ITENS.find(i => i[0] === id);
+  if (!item) return;
+  manualItemAtual = id;
+
+  document.getElementById("manualLista").style.display = "none";
+  document.getElementById("manualBusca").value = item[1];
+  document.getElementById("manualConfItem").textContent = item[0] + " — " + item[1];
+  document.getElementById("manualConfMeta").textContent = "Área: " + item[2] + " · Saldo atual: " + item[3] + " · Mínimo: " + item[4];
+  document.getElementById("manualQtyInput").value = 1;
+  document.getElementById("manualConfirmacao").style.display = "block";
+}
+
+function changeManualQty(delta){
+  const inp = document.getElementById("manualQtyInput");
+  let v = (parseInt(inp.value, 10) || 1) + delta;
+  if (v < 1) v = 1;
+  inp.value = v;
+}
+
+function cancelarManual(){
+  manualItemAtual = null;
+  document.getElementById("manualConfirmacao").style.display = "none";
+  document.getElementById("manualBusca").value = "";
+  document.getElementById("manualLista").style.display = "none";
+  document.getElementById("manualBusca").focus();
+}
+
+async function registrarManual(tipo){
+  if (!manualItemAtual){ showScanStatus("Selecione um item primeiro.", "err"); return; }
+  const qtd = parseInt(document.getElementById("manualQtyInput").value, 10) || 1;
+  const item = ITENS.find(i => i[0] === manualItemAtual);
+  showScanStatus("Registrando " + tipo.toLowerCase() + " de " + qtd + "x " + item[1] + "...", "ok");
+  document.getElementById("manualConfirmacao").style.display = "none";
+  try {
+    const res = await fetch(SCAN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: currentIdToken, itemId: manualItemAtual, tipo, quantidade: qtd })
+    });
+    const resultado = await res.json();
+    if (!resultado.ok){
+      showScanStatus("Erro: " + (resultado.erro || "motivo desconhecido"), "err");
+      document.getElementById("manualConfirmacao").style.display = "block";
+      return;
+    }
+    showScanStatus(tipo + " de " + qtd + "x " + resultado.item + " registrada. Novo saldo: " + resultado.saldo + ".",
+      resultado.saldo <= resultado.minimo ? "warn" : "ok");
+    manualItemAtual = null;
+    document.getElementById("manualBusca").value = "";
+    await carregarDadosReais();
+  } catch(e){
+    console.error(e);
+    showScanStatus("Não foi possível conectar ao servidor.", "err");
+    document.getElementById("manualConfirmacao").style.display = "block";
+  }
+}
+// ─── FIM MANUAL ───────────────────────────────────────────────────────────────
 
 
 function abrirGraficos(){
